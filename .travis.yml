@@ -1,0 +1,19 @@
+
+language: python
+
+python:
+  - "3.5"
+
+env:
+  - PYTHON_TEST_VERSION=2.7
+  - PYTHON_TEST_VERSION=3.5
+  - PYTHON_TEST_VERSION=3.6
+
+install:
+  # Name of the environment for testing
+  - export XR_TEST_ENV=xarray-test-env
+  - conda create --name $XR_TEST_ENV xarray numpy pandas scikit-learn
+  - source activate $XR_TEST_ENV
+
+script:
+  - python -c "from xarray_filters.datasets import make_blobs;make_blobs()"
