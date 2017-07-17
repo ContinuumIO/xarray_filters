@@ -77,11 +77,37 @@ def sklearn_output_as_format(sklearn_out,
                              x_output_type='xarray:Dataset',
                              y_output_type='numpy:ndarray',
                              sample_weight_output_type='numpy:ndarray',
-                             shape=None, as_flat=False,
+                             shape=None,
+                             as_flat=False,
                              dims=None,
                              reshaper=None,
                              make_sample_weight=None,
                              **kwargs):
+    """Make dataset based on the output of a sklearn.dataset function.
+
+    Parameters
+    ----------
+    sklearn_out: output from a sklearn.datasets datagen function
+    x_output_type: string (default: 'xarray:Dataset')
+    y_output_type: string (default: 'numpy:ndarray')
+    sample_weight_output_type: type of sample weights (default: 'numpy:ndarray')
+    shape: tuple, optional
+        [TODO] Currently required in code. Either require in signature or do
+        something else but raise an error when the default None value is
+        passed.
+    as_flat: boolean, optional
+    dims: tuple of strings, optional
+    reshaper: type? [TODO] unused in code
+    make_sample_weight: function
+        See _split_sklearn_out.
+
+    Returns
+    -------
+    X2: xarray.DataSet of features
+    y2: 1-dimensional numpy.array of labels
+    sample_weight2: 1-dimensional numpy.array of sample weights, same shape as y2
+
+    """
     if not shape:
         raise ValueError('Expected shape keyword argument')
 
@@ -99,10 +125,33 @@ def sklearn_output_as_format(sklearn_out,
     X2 = _X_to_type(X, x_typ, dims, shape)
     y2 = _y_to_type(y, y_typ, dims, shape)
     sample_weight2 = _sw_to_type(sample_weight, sw_output_type, dims, shape)
-    return (X2, y2, sample_weight2,)
+    return X2, y2, sample_weight2
 
 
 def make_base(sklearn_func, *args, **kwargs):
+    """Make dataset based on sklearn datagen function.
+
+    Parameters    
+    ----------
+    sklearn_func : function from sklearn.datasets
+        Examples: make_blobs, make_regression, etc.
+    args : positional arguments passed to sklearn_func
+    kwargs : keyword arguments passed to sklearn_func and sklearn_output_as_format
+        You may also pass a 'shape' (tuple of integers) and corresponding
+        dimension names 'dims' (tuple of strings, same size as 'shape'). This
+        follows the xarray.DataArray conventions. 
+
+    Returns
+    -------
+    X: xarray.DataSet of features
+    y: 1-dimensional numpy.array of labels
+    sample_weight: 1-dimensional numpy-array of sample weights, same shape as y
+        See documentation of [TODO] for this.
+
+    See Also
+    --------
+    sklearn_output_as_format
+    """
     if not kwargs.get('shape'):
         kwargs['shape'] = DEFAULT_SHAPE
     kw = {k: v for k,v in kwargs.items() if k not in NON_SKLEARN_KWARGS}
@@ -110,7 +159,8 @@ def make_base(sklearn_func, *args, **kwargs):
     sklearn_out = sklearn_func(*args, **kw)
     if not kwargs.get('dims'):
         kwargs['dims'] = tuple('xyzt')[:len(kwargs['shape'])]
-    return sklearn_output_as_format(sklearn_out, **kwargs)
+    X, y, sample_weight = sklearn_output_as_format(sklearn_out, **kwargs)
+    return X, y, sample_weight
 
 
 make_regression = partial(make_base, skdatasets.make_regression)
