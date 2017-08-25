@@ -78,6 +78,8 @@ def synthetic_coords(shape, layers, dims):
     return coords, dims
 
 
+OK_METHOD_KW = ('shape', 'dims', 'feature_names',) # FILL THIS OUT ? TODO - Gui?
+
 class XyTransformer:
     "Transforms a pair (feature_matrix, labels_vector) with to_* methods."
     def __init__(self, X, y=None):
@@ -149,6 +151,19 @@ def _make_base(skl_sampler_func):
     it would not change the docstring or the signature of the function, as it
     would keep the original one from the wrapped function from sklearn. So we
     have to do the process manually.
+
+    TODO - Gui - Ensure the default data structures returned are:
+      * X -> MLDataset from PR 3 (xr.Dataset for now)
+      * y -> Should be a numpy 1-D array
+        * TODO - Gui - after this PR is merged, make an issue
+          in xarray_filters to support different data structures
+          for y - eventually y may be a DataArray, Series,
+          * See scikit-learn docs - warnings - do we want a 1-D array for
+          y into scikit-learn or do we want a 2-D array for y that
+          has only 1 column.  (.squeeze?)
+            * Try to summarize plan for what shape y should be
+              for most methods - we'll need to standardize y
+              in the final step of any chained transformers
     """
     def wrapper(*args, **kwargs):
         '''
@@ -157,19 +172,27 @@ def _make_base(skl_sampler_func):
                return an XyTransformer but
                rather the output of an
                XyTransformer method
+
         sk_args, sk_kw = ...do something to get only
                           args/kwargs that sklearn.dataset
                           func needs
         other_args, other_kw = ...do something to get only
                                args/kwargs related to
                                XyTransformer
+        Check sklearn docs, but I think that
+            there are no args - just kwargs
         X, y = skl_sampler_func(*sk_args, **sk_kw)
         xyt = XyTransformer(X, y)
         method = .....some way of mapping to the correct
                       XyTransformer method, like getting
-                      the method out of other_kw
+                      the method out of other_kw - related to "astype"
         func = getattr(xyt, method)
         return func(*other_args, **other_kw)
+
+        Some of other_kw -> may be calculated from sk_kw or vice versa?, e.g.
+            sk_kw - n_samples
+            other_kw - shape (must be consistent)
+            Take shape keyword or Exception if n_samples given
         '''
         X, y = skl_sampler_func(*args, **kwargs)
         return XyTransformer(X, y)
@@ -241,9 +264,7 @@ Attributes:
     attrs = dict(metadata=[args, kw])
     # TODO - PR 3's MLDataset instead of Dataset
     dset = xr.Dataset(dset, attrs=attrs)
-    with open('abc.js', 'w') as f:
-        import json
-        f.write(json.dumps(dict(name_tracker), indent=2))
+    # TODO - allow converting to dataframe, numpy array?
     return dset
 
 
