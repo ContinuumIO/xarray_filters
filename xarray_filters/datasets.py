@@ -56,15 +56,26 @@ named.
 """
 
 
-import sklearn.datasets
+
 import inspect
+import string
 
 import numpy as np
 import xarray as xr
 import pandas as pd
+import sklearn.datasets
 
-from collections import Sequence, OrderedDict
+from collections import Sequence, OrderedDict, defaultdict
 from functools import partial, wraps
+
+def synthetic_coords(shape, layers, dims):
+    coord_np_arrs = tuple(np.arange(s) for s in shape)
+    space = pd.MultiIndex.from_arrays(coord_np_arrs, names=dims)
+    # TODO use PR 3's constants.py default dimension
+    # names rather than hard coding them here
+    coords = OrderedDict([('space', space), ('layer', layers)])
+    dims = ('space', 'layer')
+    return coords, dims
 
 
 class XyTransformer:
@@ -77,6 +88,7 @@ class XyTransformer:
         """
         self.X = X  # always a 2d numpy.array
         self.y = y  # always a 1d numpy.array
+
     def to_array(self, feature_shape=None):
         "Return X, y NumPy arrays with given shape"
         if feature_shape:
@@ -84,12 +96,14 @@ class XyTransformer:
         else:
             X, y = self.X, self.y
         return X, y
+
     def to_dataframe(self, feature_names=None, label_name=None):
         "Return a dataframe X and a label series y with named variables."
         Xdf = pd.DataFrame(self.X, columns=feature_names)
         ys = pd.Series(self.y, name=label_name)
         return Xdf, ys
-    def to_flat_xarray_with_layers(self, layers=None):
+
+    def to_dataset(self, layers=None, shape=None, dims=None):
         """Return an Xarray with layers and space
 
         [TODO]: improve this docstring.
@@ -98,18 +112,30 @@ class XyTransformer:
         """
         assert self.X.ndim == 2
         ncols = self.X.shape[1]
-
-        def synthetic_coords(shape, layers):
-            space = np.arange(shape[0])
-            coords = dict(layers=layers, space=space)
-            dims = ('space', 'layers')
-            return coords, dims
-
+        if shape is None:
+            shape = (self.y.size, 1)
+        if dims is None:
+            defaults = ('x', 'y', 'z', 't')
+            if len(shape) <= len(defaults):
+                dims = defaults[:len(shape)]
+            else:
+                dims = defaults + tuple(s for s in string.ascii_letters if s not in defaults)
+                dims = dims[:len(shape)]
+                assert len(dims) == len(shape)
         if not layers:
             layers = ['label_{}'.format(c) for c in range(ncols)]
-        coords, dims = synthetic_coords(self.X.shape, layers)
+        coords, dims = synthetic_coords(self.X.shape, layers, dims)
         xarr = xr.DataArray(self.X, coords=coords, dims=dims)
-        return xarr
+        # TODO xr.Dataset -> MLDataset from PR 3
+        dset = xr.Dataset(OrderedDict([('features', xarr)]))
+        return dset, self.y
+
+    def to_ml_features(self, layers=None, shape=None, dims=None, **features_kw):
+        dset, _ = self.to_dataset(layers=layers, shape=shape, dims=dims)
+        # TODO - This won't work until PR 3 merge and change
+        # is made in above TODO note on MLDataset
+        dset = dset.to_ml_features(**features_kw)
+        return dset, self.y
 
 
 def _make_base(skl_sampler_func):
@@ -125,6 +151,26 @@ def _make_base(skl_sampler_func):
     have to do the process manually.
     """
     def wrapper(*args, **kwargs):
+        '''
+        TODO - Gui see if we can do something
+               like this instead so that we don't
+               return an XyTransformer but
+               rather the output of an
+               XyTransformer method
+        sk_args, sk_kw = ...do something to get only
+                          args/kwargs that sklearn.dataset
+                          func needs
+        other_args, other_kw = ...do something to get only
+                               args/kwargs related to
+                               XyTransformer
+        X, y = skl_sampler_func(*sk_args, **sk_kw)
+        xyt = XyTransformer(X, y)
+        method = .....some way of mapping to the correct
+                      XyTransformer method, like getting
+                      the method out of other_kw
+        func = getattr(xyt, method)
+        return func(*other_args, **other_kw)
+        '''
         X, y = skl_sampler_func(*args, **kwargs)
         return XyTransformer(X, y)
     # We now have some tasks: (1) fix the docstring and (2) fix the signature of `wrapper`.
@@ -150,7 +196,62 @@ def _make_base(skl_sampler_func):
     return wrapper
 
 
-make_blobs = _make_base(sklearn.datasets.make_blobs)
-make_classification = _make_base(sklearn.datasets.make_classification)
-make_regression = _make_base(sklearn.datasets.make_regression)
+def fetch_lfw_people(*args, **kw):
+    '''TODO Gui wrap docs from sklearn equivalent
+    and add notes about it returning MLDataset
 
+    out = fetch_lfw_people()
+    In [6]: out.ariel_sharon_65
+Out[6]:
+<xarray.DataArray 'ariel_sharon_65' (row: 62, column: 47)>
+array([[ 111.666664,  128.333328,  123.333336, ...,  186.333328,  188.      ,
+         188.333328],
+       [ 103.      ,  124.666664,  121.      , ...,  184.333328,  186.      ,
+         187.333328],
+       [  97.      ,  119.333336,  114.666664, ...,  178.333328,  180.333328,
+         183.333328],
+       ...,
+       [  23.666666,   24.      ,   20.      , ...,  182.      ,  192.666672,
+         200.      ],
+       [  21.333334,   20.666666,   18.      , ...,  191.      ,  201.      ,
+         202.666672],
+       [  20.666666,   18.      ,   14.666667, ...,  197.333328,  202.      ,
+         199.333328]], dtype=float32)
+Coordinates:
+  * row      (row) int64 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 ...
+  * column   (column) int64 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 ...
+Attributes:
+    id:       373
+    name:     Ariel Sharon
+    '''
+    out = sklearn.datasets.fetch_lfw_people(*args, **kw)
+    dset = OrderedDict()
+    name_tracker = defaultdict(lambda: -1)
+    for img, name_id in zip(out.images, out.target):
+        name = out.target_names[name_id]
+        name_tracker[name] += 1
+        clean_name = name.lower().replace(' ', '_') + '_' + str(name_tracker[name])
+        r, c = img.shape
+        coords = OrderedDict([('row', np.arange(r)),
+                              ('column', np.arange(c))])
+        dims = ('row', 'column',)
+        attrs = dict(name=name, id=name_id)
+        data_arr = xr.DataArray(img, coords=coords, dims=dims, attrs=attrs)
+        dset[clean_name] = data_arr
+    attrs = dict(metadata=[args, kw])
+    # TODO - PR 3's MLDataset instead of Dataset
+    dset = xr.Dataset(dset, attrs=attrs)
+    with open('abc.js', 'w') as f:
+        import json
+        f.write(json.dumps(dict(name_tracker), indent=2))
+    return dset
+
+
+sklearn_make_funcs = [_ for _ in dir(sklearn.datasets) if _.startswith('make_')]
+for func_name in sklearn_make_funcs:
+    func = getattr(sklearn.datasets, func_name)
+    globals()[func_name] = _make_base(func)
+
+
+extras = ['XyTransformer', 'fetch_lfw_people']
+__all__ = sklearn_make_funcs + extras
