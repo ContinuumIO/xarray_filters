@@ -37,6 +37,12 @@ def from_ml_features(arr, axis=0):
 
 
 def ml_features_astype(dset, astype=None):
+    '''TODO - Gui modify this function as needed
+    to be consistent with your similar logic from
+    PR 1.  Consider whether we need extra keywords
+    for different situations, e.g. to control the
+    acceptable return values
+    '''
     if astype is None:
         astype = MLDataset
     if astype == MLDataset:
@@ -73,6 +79,7 @@ def to_ml_features(dset,
         trans_dim: transpose
                  (becomes a pandas.MultiIndex)
         features_layer: Name of layer of returned MLDataset instance
+        # TODO: Gui - make astype consistent with PR 2 (see comment at top of module)
         astype: MLDataset instance by default or one of:
                 'DataFrame' (returns a pandas.DataFrame)
                 'numpy'
@@ -92,9 +99,19 @@ def to_ml_features(dset,
 
 
 class MLDataset(xr.Dataset):
+    '''Wraps xarray.Dataset for chainable preprocessors and
+    reshaping to feature matricies that may be inputs to
+    scikit-learn or similar models
+
+    TODO - Gui: doctest MLDataset where needed in this
+    class defintion
+    '''
 
     def new_layer(self, *args, **kw):
-        '''TODO this function needs a new name?
+        '''TODO this function needs a new name? (it doesn't
+        always make a new layer, e.g. when name=None it
+        returns all existing DataArrays in a MLDataset
+        with transforms / aggs from argument specs.)
         args/kw are passed to xarray_filters.reshape.build_run_spec
         See docs there and
          * TODO wrap docs from build_run_spec
@@ -106,14 +123,14 @@ class MLDataset(xr.Dataset):
                        trans_dims=None,
                        features_layer=FEATURES_LAYER,
                        astype=None):
-        '''* TODO wrap docs for to_ml_features'''
+        '''* TODO Gui - wrap docstring for to_ml_features'''
         return to_ml_features(self, new_dim=new_dim,
                               trans_dims=trans_dims,
                               features_layer=features_layer,
                               astype=astype)
 
     def from_ml_features(self, features_layer=FEATURES_LAYER):
-        '''* TODO wrap docs for from_ml_features'''
+        '''* TODO wrap docstring for from_ml_features'''
         if not features_layer in self.data_vars:
             raise ValueError('features_layer ({}) not in self.data_vars'.format(features_layer))
         data_arr = self[features_layer]
@@ -123,6 +140,8 @@ class MLDataset(xr.Dataset):
     def chain_steps(self, *args, **features_kw):
         '''For each (args, kwargs) tuple in args, compute
             dset = dset.new_layer(*args, **kwargs)
+            TODO - I need to think about this approach more
+            Thoughts, Gui?
         '''
         dset = self
         for arg in args:
@@ -154,7 +173,7 @@ class MLDataset(xr.Dataset):
                            features_layer=FEATURES_LAYER,
                            concat_dim=None,
                            keep_attrs=False):
-        '''TODO - wrap docs of concat_ml_features'''
+        '''TODO - wrap docstring of concat_ml_features'''
         dsets = (self,) + tuple(dsets)
         return concat_ml_features(*dsets,
                                   features_layer=features_layer,

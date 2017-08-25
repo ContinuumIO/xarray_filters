@@ -53,10 +53,11 @@ def has_features_layer(dset, raise_err=True, features_layer=FEATURES_LAYER):
     '''Check if an MLDataset has a DataArray called "features"
     with dimensions (space, layer)
     Parameters:
-        :flat: an MLDataset
+        :dset: an MLDataset
         :raise_err: raise or not
     Returns:
-        :bool: ``True`` if flat ``False`` or ``ValueError`` if not flat (raise_err=True)
+        :bool: ``True``, ``False`` or raises ``ValueError``
+               if not flat (raise_err=True)
     '''
     arr = getattr(dset, features_layer, None)
     if arr is None or not hasattr(arr, 'dims') or tuple(arr.dims) !=  FEATURES_LAYER_DIMS:
@@ -68,7 +69,12 @@ def has_features_layer(dset, raise_err=True, features_layer=FEATURES_LAYER):
     return True
 
 
-def _on_each_layer_arr_step(namespace, layer, arr, step_label, parts):
+def _on_each_layer_arr_step(namespace, layer, arr, step_label, parts, features_layer_dims=None):
+
+    if features_layer_dims is None:
+        col_dim = FEATURES_LAYER_DIMS[1]
+    else:
+        col_dim = features_layer_dims[1]
     coords, dims, val, attrs = arr.coords, arr.dims, arr.values, arr.attrs
     attrs = copy.deepcopy(arr.attrs)
     if 'agg' == step_label:
@@ -78,20 +84,42 @@ def _on_each_layer_arr_step(namespace, layer, arr, step_label, parts):
         arr = func(*args, **kw)
     elif 'flatten' == step_label:
         new_dim, trans_dims = parts
-        if tuple(trans_dims) != tuple(arr.dims):
+        if trans_dims is not None and tuple(trans_dims) != tuple(arr.dims):
             arr = transpose(arr, trans_dims)
             coords, dims, val, attrs = arr.coords, arr.dims, arr.values, arr.attrs
             attrs = copy.deepcopy(arr.attrs)
         index = create_multi_index(arr)
         val = val.ravel()[:, np.newaxis]
-        coords = OrderedDict([(new_dim, index), ('layer', [layer])])
-        new_dims_2 = (new_dim, 'layer')
+        coords = OrderedDict([(new_dim, index), (col_dim, [layer])])
+        new_dims_2 = (new_dim, col_dim)
         arr = xr.DataArray(val, coords=coords, dims=new_dims_2, attrs=attrs)
     namespace[layer] = arr
     return arr
 
 
-def _concat_arrs(namespace, new_layer, step_label, parts, using_layers, concat_dim='layer'):
+def _same_size_dims_arrs(*arrs, raise_err=True):
+    '''Check if all DataArrays in arrs have same size and same dims
+
+    Parameters:
+        :raise_err: If True, raise ValueError if dims/sizes differ
+                    else return True/False'''
+    siz = None
+    dims = None
+    for arr in arrs:
+        if siz is not None and siz != arr.size:
+            if raise_err:
+                raise ValueError('Expected arrays of same size but found {} and {}'.format(siz, arr.size))
+            return False
+        if dims is not None and tuple(arr.dims) != dims:
+            if raise_err:
+                raise ValueError('Expected arrays of same dims but found {} and {}'.format(dims, arr.dims))
+            return False
+    return dims, siz
+
+
+def _concat_arrs(namespace, new_layer, step_label, parts, using_layers,
+                 concat_dim=None):
+
     arrs = []
     for layer in using_layers:
         arr = namespace[layer]
@@ -100,6 +128,8 @@ def _concat_arrs(namespace, new_layer, step_label, parts, using_layers, concat_d
         arrs.append(arr)
     if 'flatten' == step_label:
         if not isinstance(new_layer, tuple):
+            dims, siz = _same_size_dims_arrs(*arrs)
+            concat_dim = concat_dim or FEATURES_LAYER_DIMS[1]
             if all(concat_dim in arr.dims for arr in arrs):
                 new_arr = xr.concat(arrs, dim=concat_dim)
                 return new_arr
@@ -151,7 +181,8 @@ def reshape_from_spec(spec, dset,
                       verbose=True, copy=True,
                       return_dict=False):
     from xarray_filters.ml_features import MLDataset
-    print('Spec', spec) # TODO remove
+    print('Spec', spec) # TODO - remove this later, but for now it
+                        # shows how the spec looks for given args
     if not hasattr(spec, 'items'):
         spec = OrderedDict(spec)
     new_dset = OrderedDict()
@@ -175,6 +206,18 @@ def reshape_from_spec(spec, dset,
 
 
 def _format_aggs_transforms(agg_or_trans, action='agg'):
+    '''TODO - Document the list of list structures
+    that can be passed as aggs or transforms.  See
+    comments in tests/test_reshape.py for now
+
+    Parameters:
+        :agg_or_trans: Either the "aggs" or "transforms"
+                       arguments to build_run_spec
+        :action:       "agg" or "transform"
+
+    Returns:
+        list of lists structure for reshape_from_spec
+    '''
     if agg_or_trans is None:
         new_agg_or_trans = []
     if callable(agg_or_trans):
@@ -238,8 +281,9 @@ def build_run_spec(dset, name=None, layers=None,
     aggs = _format_aggs_transforms(aggs)
     layers = [['layers', layers or list(dset.data_vars)]]
     name = name or tuple(layers[0][1])
-    if flatten is None:
-        flatten = [['flatten', 'space', ['y', 'x']]]
+    if flatten is True:
+        # Guess
+        flatten = [['flatten', FEATURES_LAYER_DIMS[0], None]]
     elif flatten is False:
         flatten = []
     else:
@@ -258,10 +302,28 @@ def build_run_spec(dset, name=None, layers=None,
 def concat_ml_features(*dsets,
                        features_layer=FEATURES_LAYER,
                        concat_dim=None,
-                       keep_attrs=False): # TODO True or False (convention?)
+                       keep_attrs=False):
+
+    '''Concatenate MLDataset / Dataset (dsets) along concat_dim
+    (by default the column dimension, typically called "layer")
+
+    Parameters:
+        :dsets: Any number of MLDataset / Dataset objects that are
+                2D
+        :features_layer: Typically "layer", the column dimension
+        :concat_dim: If None, the column dimension is guessed
+        :keep_attrs: If True, keep the attrs of the first dset in *dsets
+    TODO - Gui: This could use the astype logic discussed elsewhere?
+
+
+    '''
+
+    # TODO True or False (convention?)
     from xarray_filters.ml_features import MLDataset
+    if not dsets:
+        raise ValueError('No MLDataset / Dataset arguments passed.  Expected >= 1')
     if keep_attrs:
-        attrs = dset.attrs.copy()
+        attrs = dsets[0].attrs.copy()
     else:
         attrs = {}
     concat_dim = concat_dim or FEATURES_LAYER_DIMS[1]

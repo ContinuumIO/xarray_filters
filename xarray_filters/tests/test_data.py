@@ -11,16 +11,21 @@ from xarray_filters import *
 
 @data_vars_iter(return_dataset=True)
 def iqr_standard(arr, **kw):
+    '''Uses data_vars_iter to turn a DataArray function
+    into one that operates on each array in a Dataset like
+    structure'''
     median = arr.quantile(0.5)
     upper = arr.quantile(0.75)
     lower = arr.quantile(0.25)
     return (arr - median) / (upper - lower)
 
-Spec_0 = [('tp1',
-  [['layers', ['temperature', 'pressure']],
-   ['agg', 'mean', [], {'dim': 'z'}],
-   ['agg', 'std', [], {'dim': 't'}],
-   ['flatten', 'space', ['y', 'x']]])]
+## The following are "spec" arguments to build_run_spec for testing
+
+Spec_0 = [('tp1',   # Name of new DataArray is tp1
+  [['layers', ['temperature', 'pressure']], # layers needed for calculation
+   ['agg', 'mean', [], {'dim': 'z'}], # aggregate over z dimension
+   ['agg', 'std', [], {'dim': 't'}], # aggregate over t dimension
+   ['flatten', 'space', ['y', 'x']]])] # call to_ml_features, transposing to (y, x) before ravel on each DataArray.values
 Spec_1 = [(('temperature', 'pressure'),
   [['layers', ['temperature', 'pressure']], ['agg', 'mean', [], {'dim': 'z'}]])]
 Spec_2 = [('tp2',

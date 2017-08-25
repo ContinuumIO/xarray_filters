@@ -8,12 +8,32 @@ import pandas as pd
 __all__ = ['create_multi_index', 'multi_index_to_coords',]
 
 def create_multi_index(arr):
+    '''From DataArray arr make a pandas.MultiIndex for the arr.coords
+
+    Parameters:
+        :arr: xarray.DataArray
+
+    Returns:
+        :index: pandas.MultiIndex - The MultiIndex has index names
+                taken from arr.dims and levels taken from arr.coords
+    '''
     np_arrs = tuple(getattr(arr, dim).values for dim in arr.dims)
     index = pd.MultiIndex.from_product(np_arrs, names=arr.dims)
     return index
 
 
 def multi_index_to_coords(arr, axis=0):
+    '''Create an OrderedDict that will be a DataArray coords
+    attribute, taking the dims and coord arrays from the DataArray
+    arr's pandas.MultiIndex on one axis (axis=0 by default)
+
+    Parameters:
+        :arr: xarray.DataArray with a pandas.MultiIndex on one dimension
+        :axis: Which axis has the pandas.MultiIndex (axis=0 by default)
+    Returns:
+        :coords: coordinates calculated from the MultiIndex
+        :dims:   dimensions calculated from the MultiIndex
+    '''
     dim = arr.dims[axis]
     multi = getattr(arr, dim)
     if not tuple(multi.coords.indexes) == (dim,):
