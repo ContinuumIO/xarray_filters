@@ -6,9 +6,18 @@ import xarray as xr
 
 from xarray_filters.ml_features import MLDataset
 
-__all__ = ['data_vars_iter']
+__all__ = ['data_vars_kwargs', 'for_each_array']
 
-def data_vars_iter(return_dataset=True, pass_data_vars=True):
+def _attrs_and_type(dset, new_dset, return_dataset, keep_attrs, **kw):
+    if return_dataset:
+        new_dset = MLDataset(new_dset)
+        if kw.get('keep_attrs', keep_attrs) or keep_attrs:
+            if dset is not None:
+                new_dset.attrs.update(dset.attrs)
+    return new_dset
+
+
+def data_vars_kwargs(return_dataset=True, keep_attrs=True):
     '''Decorate a function with a DataArray arg and DataArray
     return value.
 
@@ -24,25 +33,32 @@ def data_vars_iter(return_dataset=True, pass_data_vars=True):
                             in the tests/test_reshape.py of this repo, the
                             iqr_standard function would have 2 decorators -
                             one for a data structure type and the current one
-                            data_vars_iter)
-        :pass_data_vars: If True, keyword arguments are updated to include
-                      the layer names and DataArrays of the first arg (Dataset )
+                            data_vars_kwargs)
     '''
     def dec(func):
-        def new_func(*args, **kw):
-            dset = OrderedDict()
+        def new_func(dset=None, **kw):
+            new_dset = OrderedDict()
             kwargs = OrderedDict()
-            if pass_data_vars:
-                if args:
-                    if isinstance(args[0], (MLDataset, xr.Dataset)):
-                        kwargs.update(args[0].data_vars)
+            if dset is not None:
+                kwargs.update(dset.data_vars)
             kwargs.update(kw)
-            for k, arr in kwargs.items():
-                if not isinstance(arr, xr.DataArray):
-                    continue
-                dset[k] = func(*args, arr, **kwargs)
+            new_dset = func(**kwargs)
+            print(new_dset)
+            new_dset = _attrs_and_type(dset, new_dset, return_dataset, keep_attrs, **kw)
+            return new_dset
+        return new_func
+    return dec
+
+
+def for_each_array(return_dataset=True):
+    def dec(func):
+        def new_func(**kw):
+            new_dset = OrderedDict()
+            for k, arr in kw.items():
+                if isinstance(arr, xr.DataArray):
+                    new_dset[k] = func(arr, **kw)
             if return_dataset:
-                return xr.Dataset(dset)
-            return dset
+                return MLDataset(new_dset)
+            return new_dset
         return new_func
     return dec

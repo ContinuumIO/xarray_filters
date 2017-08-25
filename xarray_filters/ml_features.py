@@ -71,16 +71,16 @@ def to_ml_features(dset,
     calling .ravel() (flattening) each N-D DataArray in dset
 
     Parameters:
-        new_dim: Name of the row dimension created by flattening the
+        :new_dim: Name of the row dimension created by flattening the
                  coordinate arrays of each xarray.DataArray in dset.
                  The row dimension has a pandas.MultiIndex, e.g. if
                  xarray.DataArrays in dset have dims ('x', 'y')
                  then the pandas.MultiIndex has index names of ('x', 'y')
-        trans_dim: transpose
+        :trans_dim: transpose
                  (becomes a pandas.MultiIndex)
-        features_layer: Name of layer of returned MLDataset instance
+        :features_layer: Name of layer of returned MLDataset instance
         # TODO: Gui - make astype consistent with PR 2 (see comment at top of module)
-        astype: MLDataset instance by default or one of:
+        :astype: MLDataset instance by default or one of:
                 'DataFrame' (returns a pandas.DataFrame)
                 'numpy'
                 'DataArray'
@@ -91,10 +91,9 @@ def to_ml_features(dset,
     Returns:
         MLDataset instance (inherits from xarray.Dataset)
     '''
-    if trans_dims is None:
-        trans_dims = ('x', 'y')
     flatten = [new_dim, trans_dims]
-    dset = build_run_spec(dset, name=features_layer, flatten=flatten)
+    kw = dict(name=features_layer, flatten=flatten, compute=True)
+    dset = build_run_spec(dset, **kw)
     return ml_features_astype(dset, astype=astype)
 
 
@@ -122,7 +121,8 @@ class MLDataset(xr.Dataset):
                        new_dim='space',
                        trans_dims=None,
                        features_layer=FEATURES_LAYER,
-                       astype=None):
+                       astype=None,
+                       ):
         '''* TODO Gui - wrap docstring for to_ml_features'''
         return to_ml_features(self, new_dim=new_dim,
                               trans_dims=trans_dims,

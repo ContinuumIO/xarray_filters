@@ -117,61 +117,71 @@ def _same_size_dims_arrs(*arrs, raise_err=True):
     return dims, siz
 
 
-def _concat_arrs(namespace, new_layer, step_label, parts, using_layers,
+def _concat_arrs(namespace, new_layers, step_label, parts, using_layers,
                  concat_dim=None):
 
     arrs = []
     for layer in using_layers:
-        arr = namespace[layer]
-        args = namespace, layer, arr, step_label, parts
-        arr = _on_each_layer_arr_step(*args)
-        arrs.append(arr)
+        if layer in namespace:
+            arr = namespace[layer]
+            args = namespace, layer, arr, step_label, parts
+            arr = _on_each_layer_arr_step(*args)
+            arrs.append(arr)
     if 'flatten' == step_label:
-        if not isinstance(new_layer, tuple):
+        new_layer = tuple(set(new_layers) - set(namespace))
+        if new_layer and len(new_layer) == 1:
             dims, siz = _same_size_dims_arrs(*arrs)
             concat_dim = concat_dim or FEATURES_LAYER_DIMS[1]
             if all(concat_dim in arr.dims for arr in arrs):
                 new_arr = xr.concat(arrs, dim=concat_dim)
                 return new_arr
+        else:
+            raise ValueError('TODO - document how one ends up here :) {}'.format((new_layers, namespace.keys(), using_layers)))
     return namespace
 
 
-def _calc_new_layer_one_step(namespace, step, new_layer, using_layers):
+def _calc_new_layer_one_step(namespace, step, new_layers, using_layers):
     from xarray_filters.ml_features import MLDataset
     step_label, parts = step[0], list(step[1:])
     new_dset = namespace
     if step_label in namespace:
         namespace[step_label] = namespace[step_label].transpose(*parts[1])
     elif 'layers' == step_label:
-        arrs = (namespace[layer] for layer in using_layers)
+        arrs = (namespace[layer] for layer in using_layers if layer in namespace)
         new_dset = MLDataset(OrderedDict(zip(using_layers, arrs)))
     elif 'transform' == step_label:
         func, args, kw = parts
         kw.update(namespace)
         new_dset = func(*args, **kw)
     else:
-        args = namespace, new_layer, step_label, parts, using_layers
+        args = namespace, new_layers, step_label, parts, using_layers
         return _concat_arrs(*args)
     return new_dset
 
+def _update_namespace(new_layer, new_dset, namespace):
+    if isinstance(new_dset, xr.DataArray):
+        namespace[new_layer] = new_dset
+    elif hasattr(new_dset, 'data_vars'):
+        namespace.update(new_dset.copy(deep=True).data_vars)
+    elif hasattr(new_dset, 'items'):
+        namespace.update(new_dset)
+    else:
+        raise ValueError(repr((new_layer, new_dset, namespace.keys())))
 
-def _calc_new_layer(spc, dset, new_layer, namespace, verbose=True):
+def _calc_new_layer(spc, dset, new_layers, namespace, verbose=True):
     using_layers = None
     new_dset = None
     for idx, step in enumerate(spc):
         if 'layers' == step[0]:
-            using_layers = step[1]
+            using_layers = tuple(step[1])
         elif hasattr(dset, 'data_vars') and using_layers is None:
             using_layers = tuple(dset.data_vars)
-        args = namespace, step, new_layer, using_layers
+        new = tuple(layer for layer in new_layers if layer not in using_layers)
+        using_layers = using_layers + new
+        args = namespace, step, new_layers, using_layers
         new_dset = _calc_new_layer_one_step(*args)
-        new_dset = new_dset
-        if isinstance(new_dset, xr.DataArray):
-            namespace[new_layer] = new_dset
-        elif hasattr(new_dset, 'data_vars'):
-            namespace.update(new_dset.copy(deep=True).data_vars)
-        elif hasattr(new_dset, 'items'):
-            namespace.update(new_dset)
+        for new_layer in new_layers:
+            _update_namespace(new_layer, new_dset, namespace)
     return namespace
 
 
@@ -188,11 +198,12 @@ def reshape_from_spec(spec, dset,
     new_dset = OrderedDict()
     namespace = OrderedDict(dset.data_vars)
     for new_layer, spc in spec.items():
-        namespace = _calc_new_layer(spc, dset, new_layer, namespace, verbose=True)
         if not isinstance(new_layer, tuple):
             new_layers = (new_layer,)
         else:
             new_layers = new_layer
+        namespace = _calc_new_layer(spc, dset, new_layers, namespace, verbose=True)
+        print('ns', namespace.keys())
         for layer in new_layers:
             new_dset[layer] = namespace[layer]
     dv = OrderedDict()
@@ -256,7 +267,8 @@ def build_run_spec(dset, name=None, layers=None,
                    aggs=None, flatten=False,
                    copy=True, transforms=None,
                    return_dict=False,
-                   keep_existing_arrs=True):
+                   keep_existing_arrs=True,
+                   compute=None):
     '''Check if an MLDataset has a DataArray called "features"
     with dimensions (space, layer)
     Parameters:
@@ -270,10 +282,14 @@ def build_run_spec(dset, name=None, layers=None,
                dimensionality of each layer in layers
         :flatten: False
         :copy: True
-        :transforms:None
-        :return_dict:False
-        :keep_existing_arrs:True
-        :raise_err: raise or not
+        :transforms: None
+        :return_dict: False
+        :keep_existing_arrs: True
+        :compute: If False/None, do not call .compute
+                  If True call .compute
+                  If a dict, then pass kwargs, e.g. dset.compute(**compute)
+                  TODO - copy this help to all funcs
+                  using compute=None as keyword
     Returns:
         :bool: ``True`` if flat ``False`` or ``ValueError`` if not flat (raise_err=True)
     '''
@@ -282,7 +298,8 @@ def build_run_spec(dset, name=None, layers=None,
     layers = [['layers', layers or list(dset.data_vars)]]
     name = name or tuple(layers[0][1])
     if flatten is True:
-        # Guess
+        # Typically "space" for the new row dimension
+        # None means no transpose before .ravel
         flatten = [['flatten', FEATURES_LAYER_DIMS[0], None]]
     elif flatten is False:
         flatten = []
@@ -293,10 +310,15 @@ def build_run_spec(dset, name=None, layers=None,
         else:
             flatten = [flatten]
     spec = [(name, layers + transforms + aggs + flatten)]
-    return reshape_from_spec(spec, dset,
+    dset = reshape_from_spec(spec, dset,
                              return_dict=return_dict,
                              keep_existing_arrs=keep_existing_arrs,
                              copy=copy)
+    if compute:
+        if not isinstance(compute, dict):
+            compute = dict()
+        return dset.compute(**compute)
+    return dset
 
 
 def concat_ml_features(*dsets,

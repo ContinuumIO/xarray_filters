@@ -1,6 +1,9 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+from collections import OrderedDict
+
 import numpy as np
+import pytest
 import xarray as xr
 
 from xarray_filters import *
@@ -37,6 +40,7 @@ def test_aggregations_can_chain():
                            flatten=True, # call to_ml_features with defaults
                         ).compute()
     assert np.all(new_Xb.tp2 == new_X.tp1)
+
 
 def test_transform_no_name():
     '''with no "name" keyword - all layers are returned'''
@@ -90,6 +94,7 @@ def test_aggs_no_name():
         assert key in X.data_vars
         assert data_arr.dims == ('x', 'y')
 
+
 def test_named_aggregation_to_features():
     X = new_test_dataset(TEST_LAYERS)
     name = 'new_data_array'
@@ -107,13 +112,54 @@ def test_named_aggregation_to_features():
     assert list(example[name].layer.values) == TEST_LAYERS
     assert len(tuple(example[name].space.values[0])) == 2 # (x, y)
 
+
 def test_to_and_from_feature_matrix():
     X = new_test_dataset(TEST_LAYERS).mean(dim=('z', 't'))
-    X2 = X.to_ml_features().compute()
+    X2 = X.to_ml_features()
     assert (FEATURES_LAYER,) == tuple(X2.data_vars)
     X3 = X2.from_ml_features()
     for layer, data_arr in X3.data_vars.items():
         assert layer in X.data_vars
         assert np.all(X[layer].values == X3[layer].values)
+
+
+def test_data_vars_keywords_varkw():
+    X = new_test_dataset(TEST_LAYERS)
+    layers_with_mag = tuple(TEST_LAYERS) + ('magnitude',)
+    @data_vars_kwargs(return_dataset=False)
+    def example(**kw):
+        for layer in TEST_LAYERS:
+            assert layer in X.data_vars
+            assert isinstance(X[layer], xr.DataArray)
+        mag = (kw['wind_x'] ** 2 + kw['wind_y'] ** 2) ** 0.5
+        arrs = tuple(kw.values(),) + (mag,)
+        return OrderedDict(zip(layers_with_mag, arrs))
+    X2 = X.new_layer(layers=layers_with_mag, transforms=example, compute=True)
+    assert isinstance(X2, MLDataset)
+    assert 'magnitude' in X2.data_vars
+    assert all(layer in X2.data_vars for layer in TEST_LAYERS)
+
+
+@pytest.mark.parametrize('layers', (None, ('wind_x', 'wind_y')))
+def test_data_vars_keywords_positional(layers):
+    X = new_test_dataset(TEST_LAYERS)
+    layers_with_mag = tuple(TEST_LAYERS) + ('magnitude',)
+    @data_vars_kwargs(return_dataset=False)
+    def example(wind_x, wind_y, temperature, pressure, **kw):
+        mag = (wind_x ** 2 + wind_y ** 2) ** 0.5
+        arrs = (wind_x, wind_y, temperature, pressure, mag)
+
+        return OrderedDict(zip(layers_with_mag, arrs))
+
+    X2 = X.new_layer(layers=layers_with_mag,
+                     transforms=example,
+                     compute=True)
+    assert isinstance(X2, MLDataset)
+    assert 'magnitude' in X2.data_vars
+    if layers is not None:
+        assert all(layer in X2.data_vars for layer in TEST_LAYERS)
+    else:
+        assert len(X2.data_vars)
+
 
 

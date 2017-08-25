@@ -9,9 +9,9 @@ import xarray as xr
 
 from xarray_filters import *
 
-@data_vars_iter(return_dataset=True)
+@for_each_array(return_dataset=True)
 def iqr_standard(arr, **kw):
-    '''Uses data_vars_iter to turn a DataArray function
+    '''Uses data_vars_kwargs to turn a DataArray function
     into one that operates on each array in a Dataset like
     structure'''
     median = arr.quantile(0.5)
