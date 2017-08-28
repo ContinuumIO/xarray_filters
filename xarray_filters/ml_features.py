@@ -1,14 +1,19 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 from collections import OrderedDict
+from functools import wraps
 
 import xarray as xr
 
-from xarray_filters.reshape import build_run_spec
+from xarray_filters.reshape import (build_run_spec,
+                                    concat_ml_features)
 from xarray_filters.multi_index import multi_index_to_coords
 from xarray_filters.constants import FEATURES_LAYER
 
-__all__ = ['from_ml_features', 'to_ml_features', 'MLDataset']
+__all__ = ['from_ml_features',
+           'to_ml_features',
+           'MLDataset',
+           'merge']
 
 def from_ml_features(arr, axis=0):
     '''
@@ -92,7 +97,8 @@ def to_ml_features(dset,
         MLDataset instance (inherits from xarray.Dataset)
     '''
     flatten = [new_dim, trans_dims]
-    kw = dict(name=features_layer, flatten=flatten, compute=True)
+    kw = dict(name=features_layer, flatten=flatten,
+              keep_existing_layers=False, compute=True)
     dset = build_run_spec(dset, **kw)
     return ml_features_astype(dset, astype=astype)
 
@@ -179,3 +185,8 @@ class MLDataset(xr.Dataset):
                                   features_layer=features_layer,
                                   concat_dim=concat_dim,
                                   keep_attrs=keep_attrs)
+
+@wraps(xr.merge)
+def merge(*args, **kw):
+    return MLDataset(xr.merge(*args, **kw))
+

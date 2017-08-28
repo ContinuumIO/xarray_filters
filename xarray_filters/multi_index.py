@@ -39,6 +39,9 @@ def multi_index_to_coords(arr, axis=0):
     if not tuple(multi.coords.indexes) == (dim,):
         raise ValueError('MultiIndex has >1 dim ({}) - expected {}'.format())
     multi = multi.coords.indexes[dim]
+    if not isinstance(multi, pd.MultiIndex):
+        coords = OrderedDict([(dim, multi.values)])
+        return coords, (dim,)
     if any(name is None for name in multi.names):
         raise ValueError('Expected MultiIndex with named components (found {})'.format(multi.names))
     np_arrs = (np.unique(x) for x in np.array(multi.tolist()).T)
