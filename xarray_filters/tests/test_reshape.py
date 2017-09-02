@@ -12,64 +12,26 @@ from xarray_filters.tests.test_data import *
 def test_aggregations_can_chain():
     X = new_test_dataset(TEST_LAYERS)
     # The following should be the same: new_X and new_Xb
-    #    the aggregations are just done in 2 or 1 calls to new_layer
-    new_X = X.new_layer(name='tp1', # giving name != None
-                                    # that means whatever ends up
-                                    # as layers will need to do
-                                    # to_ml_features or a custom
-                                    # concatenator/reshaper
-                                    # to make a single DataArray
-                                    # out of the temperature, pressure
-                                    # DataArrays
-                        layers=['temperature', 'pressure'],
-                        transforms=[['mean', dict(dim='z')], # From 4D to 3D
-                                   ['std', dict(dim='t')]], # From 3D to 2D
-                        flatten=True,
-                        return_dict=False).compute()
-
-    new_Xb = X.new_layer(name=None, # With name = None, temperature and
-                                    # and pressure are modified
-                                    # and returned in modified condition
-                         layers=['temperature', 'pressure'],
-                         transforms=['mean', dict(dim='z')], # aggregate over z
-                         flatten=False  # Do not flatten to features
-                         ).compute().new_layer(
-                           name='tp2', #now make the new layer
-                           layers=['temperature', 'pressure'], # 3D here
-                           transforms=['std', dict(dim='t')], # 2D here
-                           flatten=True, # call to_ml_features with defaults
-                        ).compute()
-    assert np.all(new_Xb.tp2 == new_X.tp1)
+    args_kwargs = [['mean', dict(dim='z')], # From 4D to 3D
+                   ['std', dict(dim='t')]] # From 3D to 2D
+    layers = ['temperature', 'pressure']
+    new_X = X.chain(args_kwargs, layers=layers
+                   ).to_features(features_layer='temp_pres')
+    new_Xb = X.chain(args_kwargs[:1],
+                     layers=layers
+                     ).chain(args_kwargs[1:],
+                             layers=layers
+                             ).to_features(
+                             features_layer='temp_pres')
+    assert new_Xb.temp_pres.ndim == 2
+    assert new_X.temp_pres.ndim == 2
+    assert np.all(new_Xb.temp_pres == new_X.temp_pres)
 
 
 def test_transform_no_name():
     '''with no "name" keyword - all layers are returned'''
     X = new_test_dataset(TEST_LAYERS)
-    example = X.new_layer(
-        name=None,  # with name=None, all layers are passed through
-        layers=None, # optionally a list of layers can be given
-                     # to redact some of the existing layers
-                     # from return value
-        transforms=iqr_standard, # transforms, callable or list of callables
-                                 # or list like this if passing args / kwargs
-                                    # ['mean', ['arg1', 'arg2'], dict(dim='z')]
-                                 # or list like this if no args/kwargs:
-                                    # ['mean']
-                                 # or a list like this if just kwargs:
-                                    # ['mean', dict(dim='t')]  # or...
-                                    # ['mean', [], dict(dim='t')]
-                                # in each of those examples:
-                                # 'mean' is the string name of a
-                                # DataArray method
-                                # Alternatively we can pass a function
-                                # handle in place of where 'mean'
-                                # was used in lists above, e.g.
-                                # [custom_func, [1, 2, 3], dict(abc=99)]
-
-                                # Or a list of the any of the list items above:
-                                # to indicate transforms in series
-        flatten=False,
-    ).compute()
+    example = X.chain(iqr_standard)
     assert isinstance(example, MLDataset)
     assert list(example.data_vars) == TEST_LAYERS
     for key, data_arr in example.data_vars.items():
@@ -81,13 +43,8 @@ def test_transforms_no_name():
     '''with no "name" keyword, all layers are passed through
     but transforms changes the dimensionality'''
     X = new_test_dataset(TEST_LAYERS)
-    example = X.new_layer(
-        name=None,
-        layers=None,
-        transforms=[['quantile', (0.5,), dict(dim=('t', 'z'))],
-                    iqr_standard],
-        flatten=False,
-    ).compute()
+    step_1 = ['quantile', 0.5, dict(dim=('t', 'z'))]
+    example = X.chain([step_1, iqr_standard])
     assert isinstance(example, MLDataset)
     assert list(example.data_vars) == TEST_LAYERS
     for key, data_arr in example.data_vars.items():
@@ -98,12 +55,9 @@ def test_transforms_no_name():
 def test_named_aggregation_to_features():
     X = new_test_dataset(TEST_LAYERS)
     name = 'new_data_array'
-    example = X.new_layer(
-        name=name,
-        layers=None,
-        transforms=[iqr_standard, ['quantile', (0.5,), dict(dim=('t', 'z'))]],
-        flatten=True,
-    ).compute()
+    step_1 = iqr_standard
+    step_2 = ['quantile', 0.5, dict(dim=('t', 'z'))]
+    example = X.chain((step_1, step_2)).to_features(features_layer=name)
     assert isinstance(example, MLDataset)
     assert name not in X.data_vars
     assert tuple(example.data_vars) == (name,)
@@ -114,12 +68,12 @@ def test_named_aggregation_to_features():
 
 def test_to_and_from_feature_matrix():
     X = new_test_dataset(TEST_LAYERS).mean(dim=('z', 't'))
-    X2 = X.to_ml_features()
+    X2 = X.to_features()
     assert (FEATURES_LAYER,) == tuple(X2.data_vars)
     arr = X2[FEATURES_LAYER]
     assert arr.shape[1] == len(X.data_vars)
     assert arr.shape[0] == X.temperature.size
-    X3 = X2.from_ml_features()
+    X3 = X2.from_features()
     for layer, data_arr in X3.data_vars.items():
         assert layer in X.data_vars
         assert np.allclose(X[layer].values, X3[layer].values)
@@ -127,36 +81,37 @@ def test_to_and_from_feature_matrix():
 
 def test_data_vars_keywords_varkw():
     X = new_test_dataset(TEST_LAYERS)
-    layers_with_mag = tuple(TEST_LAYERS) + ('magnitude',)
-
-    @data_vars_kwargs
+    name = 'magnitude'
+    @data_vars_func
     def example(**kw):
-        for layer in TEST_LAYERS:
+        for layer, arr in kw.items():
             assert layer in X.data_vars
             assert isinstance(X[layer], xr.DataArray)
         mag = (kw['wind_x'] ** 2 + kw['wind_y'] ** 2) ** 0.5
-        arrs = tuple(kw.values(),) + (mag,)
-        return OrderedDict(zip(layers_with_mag, arrs))
-    X2 = X.new_layer(layers=layers_with_mag, transforms=example, compute=True)
+        return MLDataset(OrderedDict([(name, mag)]))
+    X2 = X.chain([example])
     assert isinstance(X2, MLDataset)
     assert 'magnitude' in X2.data_vars
-    assert all(layer in X2.data_vars for layer in TEST_LAYERS)
 
 
 @pytest.mark.parametrize('layers', (None, ('wind_x', 'wind_y')))
 def test_data_vars_keywords_positional(layers):
     X = new_test_dataset(TEST_LAYERS)
-    layers_with_mag = tuple(TEST_LAYERS) + ('magnitude',)
-    @data_vars_kwargs
+    @data_vars_func
     def example(wind_x, wind_y, temperature, pressure, **kw):
-        mag = (wind_x ** 2 + wind_y ** 2) ** 0.5
+        degree = kw.get('degree')
+        assert degree is not None
+        mag = (wind_x ** degree + wind_y ** degree) ** (1 / degree)
+        layers_with_mag = tuple(TEST_LAYERS) + ('magnitude',)
         arrs = (wind_x, wind_y, temperature, pressure, mag)
-
         return OrderedDict(zip(layers_with_mag, arrs))
 
-    X2 = X.new_layer(layers=layers_with_mag,
-                     transforms=example,
-                     compute=True)
+    @for_each_array
+    def coef_of_variation(arr, dim=None):
+        return arr.std(dim=dim) / arr.mean(dim=dim)
+    X2 = X.chain([(example, dict(degree=2)),
+                  (coef_of_variation,
+                   dict(dim=('z', 't')))])
     assert isinstance(X2, MLDataset)
     assert 'magnitude' in X2.data_vars
     if layers is not None:

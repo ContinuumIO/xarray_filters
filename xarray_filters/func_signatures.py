@@ -55,12 +55,12 @@ def get_args_kwargs_defaults(func):
         '''
     return args, kwargs, takes_variable_keywords
 
+
 def filter_args_kwargs(func, *args, **kwargs):
     '''Remove keys/values from kwargs if cannot be passed to func'''
     kw = kwargs.copy()
     arg_spec, kwarg_spec, takes_variable_keywords = get_args_kwargs_defaults(func)
     new = {}
-    missing_args = 0
     for idx, name in enumerate(arg_spec):
         if len(args) > idx:
             new[name] = args[idx]
@@ -69,12 +69,14 @@ def filter_args_kwargs(func, *args, **kwargs):
         elif takes_variable_keywords:
             pass
         else:
-            missing_args += 1
+            raise ValueError('TODO - msg? {}'.format((idx, name, arg_spec, args, kwargs, new, takes_variable_keywords)))
     for k, v in kw.items():
         if k in kwarg_spec or takes_variable_keywords:
             new[k] = v
-    return new, missing_args
-
+    for k, v in kwarg_spec.items():
+        if k not in new:
+            new[k] = v
+    return new
 
 
 __all__ = ['get_args_kwargs_defaults', 'filter_args_kwargs']

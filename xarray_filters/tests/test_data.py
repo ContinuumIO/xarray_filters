@@ -9,10 +9,9 @@ import xarray as xr
 
 from xarray_filters import *
 
-@return_dataset
 @for_each_array
 def iqr_standard(arr, **kw):
-    '''Uses data_vars_kwargs to turn a DataArray function
+    '''Uses data_vars_func to turn a DataArray function
     into one that operates on each array in a Dataset like
     structure'''
     median = arr.quantile(0.5)
@@ -26,7 +25,7 @@ Spec_0 = [('tp1',   # Name of new DataArray is tp1
   [['layers', ['temperature', 'pressure']], # layers needed for calculation
    ['agg', 'mean', [], {'dim': 'z'}], # aggregate over z dimension
    ['agg', 'std', [], {'dim': 't'}], # aggregate over t dimension
-   ['flatten', 'space', ['y', 'x']]])] # call to_ml_features, transposing to (y, x) before ravel on each DataArray.values
+   ['flatten', 'space', ['y', 'x']]])] # call to_features, transposing to (y, x) before ravel on each DataArray.values
 Spec_1 = [(('temperature', 'pressure'),
   [['layers', ['temperature', 'pressure']], ['agg', 'mean', [], {'dim': 'z'}]])]
 Spec_2 = [('tp2',

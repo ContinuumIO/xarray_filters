@@ -5,17 +5,17 @@ from functools import wraps
 
 import xarray as xr
 
-from xarray_filters.reshape import (build_run_spec,
+from xarray_filters.reshape import (chain, flatten,
                                     concat_ml_features)
 from xarray_filters.multi_index import multi_index_to_coords
 from xarray_filters.constants import FEATURES_LAYER
 
-__all__ = ['from_ml_features',
-           'to_ml_features',
+__all__ = ['from_features',
+           'to_features',
            'MLDataset',
-           'merge']
+           'merge',]
 
-def from_ml_features(arr, axis=0):
+def from_features(arr, axis=0):
     '''
     From a 2-D xarray.DataArray with a pandas.MultiIndex on one axis,
     return a MLDataset (xr.Dataset)
@@ -64,11 +64,10 @@ def ml_features_astype(dset, astype=None):
     raise ValueError('Expected one of ...TODO notes here on usage')
 
 
-def to_ml_features(dset,
-                   new_dim='space',
-                   trans_dims=None,
-                   features_layer=FEATURES_LAYER,
-                   astype=None):
+def to_features(dset, layers=None, row_dim=None,
+                col_dim=None, trans_dims=None,
+                features_layer=None, keep_attrs=False,
+                astype=None):
     '''
     From an xarray.Dataset or MLDataset instance return a
     2-D xarray.DataArray or numpy.array for input as a
@@ -76,13 +75,14 @@ def to_ml_features(dset,
     calling .ravel() (flattening) each N-D DataArray in dset
 
     Parameters:
-        :new_dim: Name of the row dimension created by flattening the
+        :row_dim: Name of the row dimension created by flattening the
                  coordinate arrays of each xarray.DataArray in dset.
                  The row dimension has a pandas.MultiIndex, e.g. if
                  xarray.DataArrays in dset have dims ('x', 'y')
                  then the pandas.MultiIndex has index names of ('x', 'y')
-        :trans_dim: transpose
+        :trans_dims: transpose
                  (becomes a pandas.MultiIndex)
+        :col_dim: becomes column dimension
         :features_layer: Name of layer of returned MLDataset instance
         # TODO: Gui - make astype consistent with PR 2 (see comment at top of module)
         :astype: MLDataset instance by default or one of:
@@ -96,10 +96,10 @@ def to_ml_features(dset,
     Returns:
         MLDataset instance (inherits from xarray.Dataset)
     '''
-    flatten = [new_dim, trans_dims]
-    kw = dict(name=features_layer, flatten=flatten,
-              keep_existing_layers=False, compute=True)
-    dset = build_run_spec(dset, **kw)
+    dset = flatten(dset, layers=layers, row_dim=row_dim,
+                   col_dim=col_dim, trans_dims=trans_dims,
+                   features_layer=features_layer,
+                   keep_attrs=keep_attrs)
     return ml_features_astype(dset, astype=astype)
 
 
@@ -112,68 +112,24 @@ class MLDataset(xr.Dataset):
     class defintion
     '''
 
-    def new_layer(self, *args, **kw):
-        '''TODO this function needs a new name? (it doesn't
-        always make a new layer, e.g. when name=None it
-        returns all existing DataArrays in a MLDataset
-        with transforms / aggs from argument specs.)
-        args/kw are passed to xarray_filters.reshape.build_run_spec
-        See docs there and
-         * TODO wrap docs from build_run_spec
-        '''
-        return self.pipe(build_run_spec, *args, **kw)
+    def to_features(self,*args, **kwargs):
+        '''* TODO Gui - wrap docstring for to_features'''
+        return flatten(self, *args, **kwargs)
 
-    def to_ml_features(self,
-                       new_dim='space',
-                       trans_dims=None,
-                       features_layer=FEATURES_LAYER,
-                       astype=None,
-                       ):
-        '''* TODO Gui - wrap docstring for to_ml_features'''
-        return to_ml_features(self, new_dim=new_dim,
-                              trans_dims=trans_dims,
-                              features_layer=features_layer,
-                              astype=astype)
-
-    def from_ml_features(self, features_layer=FEATURES_LAYER):
-        '''* TODO wrap docstring for from_ml_features'''
+    def from_features(self, features_layer=None):
+        '''* TODO wrap docstring for from_features'''
+        if features_layer is None:
+            features_layer = FEATURES_LAYER
         if not features_layer in self.data_vars:
             raise ValueError('features_layer ({}) not in self.data_vars'.format(features_layer))
         data_arr = self[features_layer]
-        dset = from_ml_features(data_arr)
+        dset = from_features(data_arr)
         return dset
 
-    def chain_steps(self, *args, **features_kw):
-        '''For each (args, kwargs) tuple in args, compute
-            dset = dset.new_layer(*args, **kwargs)
-            TODO - I need to think about this approach more
-            Thoughts, Gui?
+    def chain(self, func_args_kwargs, layers=None):
         '''
-        dset = self
-        for arg in args:
-            if isinstance(arg, Sequence) and len(arg) == 2:
-                step_args, step_kw = arg
-            elif isinstance(arg, dict):
-                step_kw = arg
-                step_args = None
-            elif isinstance(arg, (tuple, list)):
-                step_args = arg
-                step_kw = {}
-            else:
-                raise ValueError("TODO - error message")
-            # TODO - .compute here?
-            # Or should there be a non-dask.delayed
-            # equivalent of self.new_layer so that
-            # dask.distributed may parallelize this
-            # for arg in args: loop
-            dset = dset.new_layer(*step_args, **step_kw).compute()
-        if as_features:
-            if not hasattr(dset, 'data_vars'):
-                raise ValueError('as_features=True but a Dataset / MLDataset was not returned from final step.  Found ({})'.format(type(dset)))
-            if not FEATURES_LAYER in dset.data_vars:
-                raise ValueError('TODO - error message')
-            return dset.to_ml_features(**features_kw)
-        return dset
+        '''
+        return chain(self, func_args_kwargs, layers=layers)
 
     def concat_ml_features(self, *dsets,
                            features_layer=FEATURES_LAYER,
@@ -185,7 +141,6 @@ class MLDataset(xr.Dataset):
                                   features_layer=features_layer,
                                   concat_dim=concat_dim,
                                   keep_attrs=keep_attrs)
-
 @wraps(xr.merge)
 def merge(*args, **kw):
     return MLDataset(xr.merge(*args, **kw))

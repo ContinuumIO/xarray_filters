@@ -24,8 +24,8 @@ from xarray_filters.pipe_utils import for_each_array, call_custom_func
 
 __all__ = ['has_features_layer',
            'transpose',
-           'reshape_from_spec',
-           'build_run_spec']
+           'flatten',
+           'concat_ml_features',]
 
 def _transpose_arr(data_arr, new_dims):
     if not len(set(new_dims) & set(data_arr.dims)) == len(new_dims):
@@ -71,31 +71,52 @@ def has_features_layer(dset, raise_err=True, features_layer=FEATURES_LAYER):
     return True
 
 
-def _on_each_layer_arr_step(namespace, layer, arr, step_label, parts, features_layer_dims=None):
-
-    if features_layer_dims is None:
+def flatten(dset, layers=None, row_dim=None,
+            col_dim=None, trans_dims=None,
+            features_layer=None, keep_attrs=False):
+    '''
+    TODO - what is convention with keep_attrs: default=True or False?
+    '''
+    from xarray_filters.ml_features import MLDataset
+    arrs = []
+    if features_layer is None:
+        features_layer = FEATURES_LAYER
+    if row_dim is None:
+        row_dim = FEATURES_LAYER_DIMS[0]
+    if col_dim is None:
         col_dim = FEATURES_LAYER_DIMS[1]
-    else:
-        col_dim = features_layer_dims[1]
-    coords, dims, val, attrs = arr.coords, arr.dims, arr.values, arr.attrs
-    attrs = deepcopy(arr.attrs)
-    if 'flatten' == step_label:
-        new_dim, trans_dims = parts
-        if trans_dims is not None and tuple(trans_dims) != tuple(arr.dims):
-            arr = transpose(arr, trans_dims)
-            coords, dims, val, attrs = arr.coords, arr.dims, arr.values, arr.attrs
-            attrs = deepcopy(arr.attrs)
+    if layers is None:
+        layers = tuple(dset.data_vars)
+    for layer in layers:
+        if not layer in dset.data_vars:
+            raise ValueError('TODO - message')
+        arr = dset[layer]
+        coords, dims, val, attrs = arr.coords, arr.dims, arr.values, arr.attrs
+        if trans_dims is not None:
+            if tuple(trans_dims) != tuple(arr.dims):
+                arr = transpose(arr, trans_dims)
+                coords, dims, val, attrs = arr.coords, arr.dims, arr.values, arr.attrs
+                attrs = arr.attrs
+        attrs = deepcopy(attrs)
         if len(dims) == 1:
-            new_dim = dims[0]
-            index = getattr(arr, new_dim)
+            row_dim = dims[0]
+            index = getattr(arr, row_dim)
         else:
             index = create_multi_index(arr)
         val = val.ravel()[:, np.newaxis]
-        coords = OrderedDict([(new_dim, index), (col_dim, [layer])])
-        new_dims_2 = (new_dim, col_dim)
-        arr = xr.DataArray(val, coords=coords, dims=new_dims_2, attrs=attrs)
-    namespace[layer] = arr
-    return arr
+        coords = OrderedDict([(row_dim, index),
+                              (col_dim, [layer])])
+        new_dims = (row_dim, col_dim)
+        arr = xr.DataArray(val, coords=coords,
+                           dims=new_dims, attrs=attrs)
+        arrs.append(arr)
+    dims, siz = _same_size_dims_arrs(*arrs)
+    if not all(col_dim in arr.dims for arr in arrs):
+        raise ValueError('TODO - document how one ends up here {}'.format(layers))
+    new_arr = xr.concat(arrs, dim=col_dim)
+    if not keep_attrs:
+        attrs = OrderedDict()
+    return MLDataset(OrderedDict([(features_layer, new_arr)]),attrs=attrs)
 
 
 def _same_size_dims_arrs(*arrs, raise_err=True):
@@ -103,7 +124,8 @@ def _same_size_dims_arrs(*arrs, raise_err=True):
 
     Parameters:
         :raise_err: If True, raise ValueError if dims/sizes differ
-                    else return True/False'''
+                    else return True/False
+    '''
     siz = None
     dims = None
     for arr in arrs:
@@ -118,225 +140,65 @@ def _same_size_dims_arrs(*arrs, raise_err=True):
     return dims, siz
 
 
-def _concat_arrs(namespace, new_layers, step_label, parts, using_layers,
-                 concat_dim=None):
+def subset_layers(dset, layers):
     from xarray_filters.ml_features import MLDataset
-    arrs = []
-    for layer in using_layers:
-        if layer in namespace:
-            arr = namespace[layer]
-            args = namespace, layer, arr, step_label, parts
-            arr = _on_each_layer_arr_step(*args)
-            arrs.append(arr)
-    if 'transform' == step_label:
-        func, args, kwargs = parts
-        #print('transform', func, args, kwargs)
-        if callable(func):
-            kw = OrderedDict()
-            kw.update(kwargs)
-            kw.update(namespace)
-            return call_custom_func(func, *args, layers_list=namespace, **kw)
-        else:
-            new_dset = OrderedDict()
-            for layer, arr in namespace.items():
-                if isinstance(arr, (xr.DataArray, xr.Dataset, MLDataset)):
-                    func_handle = getattr(arr, func)
-                    namespace[layer] = call_custom_func(func_handle, *args, layers_list=namespace, **kwargs)
-    elif 'flatten' == step_label:
-        new_layer = tuple(set(new_layers) - set(namespace))
-        if new_layer and len(new_layer) == 1:
-            dims, siz = _same_size_dims_arrs(*arrs)
-            concat_dim = concat_dim or FEATURES_LAYER_DIMS[1]
-            if all(concat_dim in arr.dims for arr in arrs):
-                new_arr = xr.concat(arrs, dim=concat_dim)
-                return new_arr
-        else:
-            raise ValueError('TODO - document how one ends up here :) {}'.format((new_layers, namespace.keys(), using_layers)))
-    return namespace
-
-
-def _calc_new_layer_one_step(namespace, step, new_layers, using_layers):
-    from xarray_filters.ml_features import MLDataset
-    step_label, parts = step[0], list(step[1:])
-    new_dset = None
-    if step_label in namespace:
-        namespace[step_label] = namespace[step_label].transpose(*parts[1])
-    elif 'layers' == step_label:
-        arrs = (namespace[layer] for layer in using_layers
-                if layer in namespace)
-        new_dset = MLDataset(OrderedDict(zip(using_layers, arrs)))
-    else:
-        args = namespace, new_layers, step_label, parts, using_layers
-        return _concat_arrs(*args)
+    arrs = (dset[layer] for layer in layers
+            if layer in dset.data_vars)
+    new_dset = MLDataset(OrderedDict(zip(layers, arrs)))
     return new_dset
 
 
-def _update_namespace(new_layer, new_dset, namespace):
-    #print('un', new_layer, type(new_dset), namespace.keys())
-    if isinstance(new_dset, xr.DataArray):
-        if new_layer is not None:
-            namespace[new_layer] = new_dset
-        return namespace
-    if hasattr(new_dset, 'data_vars'):
-        as_dict = new_dset.copy(deep=True).data_vars
-    elif hasattr(new_dset, 'items'):
-        as_dict = new_dset
-    else:
-        raise ValueError(repr((new_layer, new_dset, namespace.keys())))
-    if new_layer in as_dict:
-        _update_namespace(new_layer, as_dict[new_layer], namespace)
-    else:
-        for k, arr in as_dict.items():
-            _update_namespace(k, arr, namespace)
-    return namespace
-
-
-def _calc_new_layer(spc, dset, new_layers, namespace, verbose=True):
-    using_layers = None
-    new_dset = None
-    for idx, step in enumerate(spc):
-        if 'layers' == step[0]:
-            using_layers = tuple(step[1])
-        elif hasattr(dset, 'data_vars') and using_layers is None:
-            using_layers = tuple(dset.data_vars)
-        new = tuple(layer for layer in new_layers if layer not in using_layers)
-        using_layers = using_layers + new
-        args = namespace, step, new_layers, using_layers
-        new_dset = _calc_new_layer_one_step(*args)
-        for new_layer in new_layers:
-            _update_namespace(new_layer, new_dset, namespace)
-    return namespace
-
-
-@dask.delayed
-def reshape_from_spec(spec, dset,
-                      keep_existing_layers=True,
-                      verbose=True, copy=True,
-                      return_dict=False):
-    from xarray_filters.ml_features import MLDataset
-    print('Spec passed to reshape_from_spec', spec) # TODO - remove this later, but for now it
-                        # shows how the spec looks for given args
-    if not hasattr(spec, 'items'):
-        spec = OrderedDict(spec)
-    new_dset = OrderedDict()
-    namespace = OrderedDict(dset.data_vars)
-    original_layers = tuple(namespace)
-    for new_layer, spc in spec.items():
-        if not isinstance(new_layer, (tuple, list,)):
-            new_layers = (new_layer,)
-        else:
-            new_layers = new_layer
-        namespace = _calc_new_layer(spc, dset, new_layers,
-                                    namespace, verbose=True)
-    for layer, arr in namespace.items():
-        if layer not in original_layers or keep_existing_layers:
-            #print(layer, 'is', type(arr))
-            if isinstance(arr, xr.DataArray):
-                new_dset[layer] = namespace[layer]
-    if return_dict:
-        return new_dset
-    return MLDataset(new_dset)
-
-
-def _format_transforms(trans, action='transform'):
+def format_chain_args(trans):
     '''TODO - Document the list of list structures
     that can be passed transforms.  See
     comments in tests/test_reshape.py for now
 
     Parameters:
-        :trans: "transforms" arguments to build_run_spec
-        :action:       "transform"
+        :trans: "transforms" arguments to MLDataset.chain
 
     Returns:
-        list of lists structure for reshape_from_spec
+        list of lists like [[func1, args1, kwargs1],
+                            [func2, args2, kwargs2]]
+        to be passed to MLDataset.pipe(func, *args, **kwargs) on
+        each func, args, kwargs.  Note
     '''
-    if trans is None:
-        return []
+    output = []
     if callable(trans):
-        new_trans = [[action, trans, [], {}]]
+        output.append([trans, [], {}])
     elif isinstance(trans, (tuple, list)):
         trans = list(trans)
-        new_trans = []
         for tran in trans:
             if callable(tran):
-                new_trans.append([action, tran, [], {}])
-            elif isinstance(tran, (list, tuple)):
+                output.append([tran, [], {}])
+            elif isinstance(tran, (list, tuple)) and tran:
                 tran = list(tran)
-                args = [_ for _ in tran if isinstance(_, (tuple, list))]
-                kw = [_ for _ in tran if isinstance(_, dict)]
-                func = [_ for _ in tran if isinstance(_, str) or callable(_)]
-                if not func:
-                    raise ValueError('Expected a string DataArray method name or a callable in {}'.format(tran))
-                func = func[0]
-                if args:
-                    args = args[0]
-                if kw:
-                    kw = kw[0]
+                if isinstance(tran[-1], dict):
+                    kw = tran[-1]
+                    kw_idx = len(tran) - 1
                 else:
                     kw = dict()
-                tran = [action, func, args, kw]
-                new_trans.append(tran)
-    return new_trans
+                    kw_idx = None
+                func = [idx for idx, _ in enumerate(tran)
+                        if isinstance(_, str) or callable(_)]
+                if not func:
+                    raise ValueError('Expected a string DataArray method name or a callable in {}'.format(tran))
+                args = [_ for idx, _ in enumerate(tran)
+                        if idx != kw_idx and idx not in func]
+                func = tran[func[0]]
+                tran = [func, args, kw]
+                output.append(tran)
+    return output
 
 
-def build_run_spec(dset, name=None, layers=None, flatten=False,
-                   copy=True, transforms=None,
-                   return_dict=False,
-                   keep_existing_layers=True,
-                   compute=None):
-    '''Check if an MLDataset has a DataArray called "features"
-    with dimensions (space, layer)
-    Parameters:
-        :dset: an MLDataset or xarray.Dataset instance
-        :name: name of a new layer to be added to dset
-        :layers: names of layers (DataArrays) needed for aggregations,
-                 transforms, or flatten operations that make a new
-                 layer.  If layers is None, then all DataArrays are
-                 used.
-        :flatten: False
-        :copy: True
-        :transforms: None
-        :return_dict: False
-        :keep_existing_layers: True
-        :compute: If False/None, do not call .compute
-                  If True call .compute
-                  If a dict, then pass kwargs, e.g. dset.compute(**compute)
-                  TODO - copy this help to all funcs
-                  using compute=None as keyword
-    Returns:
-        :bool: ``True`` if flat ``False`` or ``ValueError`` if not flat (raise_err=True)
-    '''
-    transforms = _format_transforms(transforms)
-    if layers is None:
-        layers = dset.data_vars
-    layers = tuple(layers)
-
-    if flatten is True:
-        # Typically "space" for the new row dimension
-        # None means no transpose before .ravel
-        flatten = [['flatten', FEATURES_LAYER_DIMS[0], None]]
-    elif flatten is False:
-        flatten = []
-    else:
-        flatten = list(flatten)
-        if 'flatten' not in flatten:
-            flatten = [['flatten'] + flatten]
-        else:
-            flatten = [flatten]
-    if flatten and not name:
-        name = (FEATURES_LAYER,)
-    if flatten:
-        keep_existing_layers = False
-    layers_step = [['layers', layers]]
-    spec = [(name, layers_step + transforms + flatten)]
-    dset = reshape_from_spec(spec, dset,
-                             return_dict=return_dict,
-                             keep_existing_layers=keep_existing_layers,
-                             copy=copy)
-    if compute:
-        if not isinstance(compute, dict):
-            compute = dict()
-        return dset.compute(**compute)
+def chain(dset, func_args_kwargs, layers=None):
+    from xarray_filters.pipe_utils import for_each_array
+    func_args_kwargs = format_chain_args(func_args_kwargs)
+    if layers is not None:
+        dset = subset_layers(dset, layers=layers)
+    for func, args, kwargs in func_args_kwargs:
+        if not callable(func):
+            func = for_each_array(func)
+        dset = dset.pipe(func, *args, **kwargs)
     return dset
 
 
@@ -364,13 +226,13 @@ def concat_ml_features(*dsets,
     if not dsets:
         raise ValueError('No MLDataset / Dataset arguments passed.  Expected >= 1')
     if keep_attrs:
-        attrs = dsets[0].attrs.copy()
+        attrs = deepcopy(dsets[0].attrs)
     else:
-        attrs = {}
+        attrs = OrderedDict()
     concat_dim = concat_dim or FEATURES_LAYER_DIMS[1]
     data_arrs = []
     for dset in dsets:
-        if not isinstance(dset, MLDataset):
+        if not isinstance(dset, (MLDataset, xr.Dataset)):
             raise ValueError('TODO -error message here')
         data_arr = dset.data_vars.get(features_layer, None)
         if data_arr is None:
