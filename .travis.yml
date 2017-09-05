@@ -19,7 +19,7 @@ install:
     - conda update conda
 
     - export ENV_NAME="$(echo xf_env_${PYTHON} | sed 's/\.//')"
-    - conda env list | grep $ENV_NAME && conda remove --name $ENV_NAME
+    - conda remove --name $ENV_NAME || true
     - conda build --python $PYTHON --numpy $NUMPY conda.recipe
     - conda create $CHANNELS --name $ENV_NAME python=$PYTHON numpy=$NUMPY xarray_filters
     - source activate $ENV_NAME
