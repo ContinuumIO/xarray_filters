@@ -289,18 +289,17 @@ def _make_base(skl_sampler_func):
             skl_kwds and k != 'astype')} 
 
         # Step 2: obtain the XyTransformer object
-        try:
+        # First we need to check that we can handle the output of skl_sampler_func
+        out = skl_sampler_func(*args, **skl_kwargs)
+        if len(out) != 2:
+            error_msg = 'Function {} must return a tuple of 2 elements'.format(skl_sampler_func.__name__)
+            raise ValueError(error_msg)
+        else:
             X, y = skl_sampler_func(*args, **skl_kwargs)
-            # some skl_sampler_funcs do not return X, y, leading to a ValueError
-        except ValueError as e:
-            if 'values to unpack' in str(e):
-                error_msg = 'Function {} does not return a tuple of 2 elements'
-                raise ValueError(error_msg.format(skl_sampler_func.__name__))
-            else:
-                raise
-        # Assert X is a feature matrix and y has the corresponding labels
-        assert X.shape[0] == y.shape[0]  # TODO: do we want this?
-        assert y.ndim == 1  # TODO do we want this?
+            if y.ndim != 1:
+                raise ValueError("Y must have dimension 1.")
+            if X.shape[0] != y.shape[0]:
+                raise ValueError('X and y must have the same number of rows')
         Xyt = XyTransformer(X, y)
 
         # Step 3: convert the data to the desired type
@@ -321,7 +320,9 @@ def _make_base(skl_sampler_func):
     keyword-only arguments:
 
     astype: str
-        One of {accepted_types}. See documentation of XyTransformer.astype.
+        One of {accepted_types} or None to return an XyTransformer. See documentation
+        of XyTransformer.astype.
+        
     **kwargs: dict
         Optional arguments that depend on astype. See documentation of
         XyTransformer.astype. 
