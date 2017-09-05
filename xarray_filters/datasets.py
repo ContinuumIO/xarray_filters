@@ -290,8 +290,6 @@ def _make_base(skl_sampler_func):
 
         # Step 2: obtain the XyTransformer object
         try:
-            print('args', args)
-            print('kwargs', skl_kwargs)
             X, y = skl_sampler_func(*args, **skl_kwargs)
             # some skl_sampler_funcs do not return X, y, leading to a ValueError
         except ValueError as e:
