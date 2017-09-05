@@ -12,6 +12,12 @@ env:
     - PYTHON=2.7 NUMPY=1.11
 
 install:
+    - wget http://repo.continuum.io/miniconda/Miniconda-latest-Linux-x86_64.sh -O miniconda.sh
+    - bash miniconda.sh -b -p $HOME/miniconda
+    - export PATH="$HOME/miniconda/bin:$PATH"
+    - conda config --set always_yes yes --set changeps1 no
+    - conda update conda
+
     - export ENV_NAME="$(echo xf_env_${PYTHON} | sed 's/\.//')"
     - conda env list | grep $ENV_NAME && conda remove --name $ENV_NAME
     - conda build --python $PYTHON --numpy $NUMPY conda.recipe
