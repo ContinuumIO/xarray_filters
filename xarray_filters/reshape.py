@@ -1,66 +1,84 @@
 '''
 -----------------------
-``earthio.reshape``
+``xarray_filters.reshape``
 ~~~~~~~~~~~~~~~~~~~~~~~
 '''
 
-from __future__ import absolute_import, division, print_function, unicode_literals
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
 
 from collections import namedtuple, OrderedDict
 from copy import deepcopy
-import os
-import warnings
 
-import attr
-import dask
 import numpy as np
 import pandas as pd
-import scipy.interpolate as spi
 import xarray as xr
 
+from xarray_filters.astype import ml_features_astype
 from xarray_filters.constants import FEATURES_LAYER_DIMS, FEATURES_LAYER
-from xarray_filters.multi_index import create_multi_index
+from xarray_filters.multi_index import create_multi_index, multi_index_to_coords
 from xarray_filters.pipe_utils import for_each_array, call_custom_func
 
-__all__ = ['has_features_layer',
-           'transpose',
-           'flatten',
-           'concat_ml_features',]
-
-def _transpose_arr(data_arr, new_dims):
-    if not len(set(new_dims) & set(data_arr.dims)) == len(new_dims):
-        raise ValueError('At least one of new_dims is not an existing dim (new_dims {}, existing {})'.format(new_dims, data_arr.dims))
-    return data_arr.transpose(*new_dims)
+__all__ = ['has_features',
+           'concat_ml_features',
+           'from_features',
+           'to_features',
+           ]
 
 
-def transpose(es, new_dims, layers=None):
-    '''Transpose an MLDataset - elm.pipeline.steps.Transpose
-    Parameters:
-        :new_dims: passed to xarray.DataArray.transpose
-        :layers: list of DataArrays layers to include
-    Returns:
-        :MLDataset transposed
-    '''
-    from xarray_filters.ml_features import MLDataset
-    if isinstance(es, (xr.Dataset, MLDataset)):
-        trans = OrderedDict()
-        layers = layers or tuple(es.data_vars)
-        for layer in layers:
-            trans[layer] = _transpose_arr(getattr(es, layer), new_dims)
-        return MLDataset(trans, attrs=es.attrs)
-    return _transpose_arr(es, new_dims)
-
-
-def has_features_layer(dset, raise_err=True, features_layer=FEATURES_LAYER):
+def has_features(dset, raise_err=True, features_layer=None):
     '''Check if an MLDataset has a DataArray called "features"
     with dimensions (space, layer)
-    Parameters:
-        :dset: an MLDataset
-        :raise_err: raise or not
-    Returns:
-        :bool: ``True``, ``False`` or raises ``ValueError``
-               if not flat (raise_err=True)
+
+    Parameters
+    ----------
+
+    dset: an MLDataset
+    raise_err: raise or not
+
+    Returns
+    -------
+
+    ``True``, ``False`` or, if ``raise_err`` raises ``ValueError``
+
+    Examples
+    --------
+
+    >>> import pandas as pd
+    >>> import numpy as np
+    >>> import xarray as xr
+    >>> from xarray_filters import (from_features, to_features,
+    ...                             MLDataset, has_features)
+    >>> index = pd.MultiIndex.from_product((np.arange(2), np.arange(2, 4)), names=('x', 'y'))
+    >>> arr1 = xr.DataArray(np.random.uniform(0,1, (4, 1)), coords=[('space', index), ('layer', ['pressure'])], dims=('space', 'layer'), name='features')
+    >>> dset1 = from_features(arr1)
+    >>> assert isinstance(dset1, MLDataset) and tuple(dset1.data_vars) == ('pressure',)
+    >>> dset2 = to_features(dset1)
+    >>> assert ('features',) == tuple(dset2.data_vars)
+    >>> assert np.all(dset2.features == arr1)
+    >>> dset2
+    <xarray.MLDataset>
+    Dimensions:   (layer: 1, space: 4)
+    Coordinates:
+      * space     (space) MultiIndex
+      - x         (space) int64 0 0 1 1
+      - y         (space) int64 2 3 2 3
+      * layer     (layer) object 'pressure'
+    Data variables:
+        features  (space, layer) float64 0.08269 0.5801 0.5294 0.6399
+    >>> has_features(dset2)
+    True
+    >>> has_features(dset1, raise_err=False)
+    False
+    >>> has_features(dset1, raise_err=True)
+    Traceback (most recent call last):
+      File "<stdin>", line 1, in <module>
+      File "/Users/psteinberg/Documents/earth/xarray_filters-new/xarray_filters/reshape.py", line 53, in has_features
+        raise ValueError(msg.format(features_layer, FEATURES_LAYER_DIMS))
+    ValueError: Expected an MLDataset/Dataset with DataArray "features" and dims ('space', 'layer')
     '''
+    if features_layer is None:
+        features_layer = FEATURES_LAYER
     arr = getattr(dset, features_layer, None)
     if arr is None or not hasattr(arr, 'dims') or tuple(arr.dims) !=  FEATURES_LAYER_DIMS:
         msg = 'Expected an MLDataset/Dataset with DataArray "{}" and dims {}'
@@ -71,13 +89,74 @@ def has_features_layer(dset, raise_err=True, features_layer=FEATURES_LAYER):
     return True
 
 
-def flatten(dset, layers=None, row_dim=None,
-            col_dim=None, trans_dims=None,
-            features_layer=None, keep_attrs=False):
+def to_features(dset, layers=None, row_dim=None,
+                col_dim=None, trans_dims=None,
+                features_layer=None, keep_attrs=False,
+                astype=None):
     '''
-    TODO - what is convention with keep_attrs: default=True or False?
+    From an xarray.Dataset or MLDataset instance return a
+    2-D xarray.DataArray or numpy.array for input as a
+    feature matrix in tools like scikit-learn (calling
+    .ravel() on N-D DataArray's to become columns)
+
+    Parameters
+    ----------
+
+    dset: xarray.Dataset or xarray_filters.MLDataset
+    row_dim: Name of the row dimension created by flattening the
+             coordinate arrays of each xarray.DataArray in dset.
+             The row dimension has a pandas.MultiIndex, e.g. if
+             xarray.DataArrays in dset have dims ('x', 'y')
+             then the pandas.MultiIndex has index names of ('x', 'y')
+             If None, row_dim becomes 'space'
+    trans_dims: transpose to trans_dims
+                (becomes a pandas.MultiIndex)
+                if trans_dims is not None
+    col_dim: Becomes column dimension name - 'layer' by default
+    features_layer: Name of single 2-D DataArray
+                    in the returned MLDataset instance.
+                    ('features' by default)
+    keep_attrs: If True, keep attributes
+    # TODO: Gui - make astype consistent with PR 2
+            (see comment at top of module)
+    astype: MLDataset instance by default or one of:
+            ('DataFrame', 'numpy', 'DataArray', 'Dataset')
+
+    It is assumed each xarray.DataArray in dset
+    has the same coords/dims.
+
+    Returns
+    -------
+
+    new_dset: xarray_filters.MLDataset instance with a single
+              2-D DataArray variable named by 'features_layer'
+              keyword argument
+    Examples
+    --------
+
+    >>> import pandas as pd
+    >>> import numpy as np
+    >>> import xarray as xr
+    >>> from xarray_filters import from_features, MLDataset
+    >>> index = pd.MultiIndex.from_product((np.arange(2), np.arange(2, 4)), names=('x', 'y'))
+    >>> arr1 = xr.DataArray(np.random.uniform(0,1, (4, 1)), coords=[('space', index), ('layer', ['pressure'])], dims=('space', 'layer'), name='features')
+    >>> dset = from_features(arr1)
+    >>> assert isinstance(dset, MLDataset) and tuple(dset.data_vars) == ('pressure',)
+    >>> arr2 = to_features(dset)
+    >>> assert np.all(arr1.values == arr2.values)
+    >>> arr2
+    <xarray.MLDataset>
+    Dimensions:   (layer: 1, space: 4)
+    Coordinates:
+      * space     (space) MultiIndex
+      - x         (space) int64 0 0 1 1
+      - y         (space) int64 2 3 2 3
+      * layer     (layer) object 'pressure'
+    Data variables:
+        features  (space, layer) float64 0.9394 0.9805 0.6831 0.7039
+
     '''
-    from xarray_filters.ml_features import MLDataset
+    from xarray_filters.mldataset import MLDataset
     arrs = []
     if features_layer is None:
         features_layer = FEATURES_LAYER
@@ -94,7 +173,7 @@ def flatten(dset, layers=None, row_dim=None,
         coords, dims, val, attrs = arr.coords, arr.dims, arr.values, arr.attrs
         if trans_dims is not None:
             if tuple(trans_dims) != tuple(arr.dims):
-                arr = transpose(arr, trans_dims)
+                arr = arr.transpose(*trans_dims)
                 coords, dims, val, attrs = arr.coords, arr.dims, arr.values, arr.attrs
                 attrs = arr.attrs
         attrs = deepcopy(attrs)
@@ -116,7 +195,64 @@ def flatten(dset, layers=None, row_dim=None,
     new_arr = xr.concat(arrs, dim=col_dim)
     if not keep_attrs:
         attrs = OrderedDict()
-    return MLDataset(OrderedDict([(features_layer, new_arr)]),attrs=attrs)
+    new_dset = MLDataset(OrderedDict([(features_layer, new_arr)]), attrs=attrs)
+    return ml_features_astype(new_dset, astype=astype)
+
+
+def from_features(arr, axis=0):
+    '''
+    From a 2-D xarray.DataArray with a pandas.MultiIndex
+    on axis (axis=0 by default), return a MLDataset
+    with DataArrays of dimensions from MultiIndex
+
+    Parameters
+    ----------
+
+        arr: 2-D xr.DataArray with
+        axis: Axis with pandas.MultiIndex (default=0)
+
+    Returns
+    -------
+
+        MLDataset instance
+
+    Examples
+    --------
+
+    >>> import pandas as pd
+    >>> import numpy as np
+    >>> import xarray as xr
+    >>> from xarray_filters import from_features, to_features, MLDataset
+    >>> index = pd.MultiIndex.from_product((np.arange(2), np.arange(2, 4)), names=('x', 'y'))
+    >>> arr1 = xr.DataArray(np.random.uniform(0,1, (4, 1)), coords=[('space', index), ('layer', ['pressure'])], dims=('space', 'layer'), name='features')
+    >>> dset1 = from_features(arr1)
+    >>> assert isinstance(dset1, MLDataset) and tuple(dset1.data_vars) == ('pressure',)
+    >>> dset2 = to_features(dset1)
+    >>> assert ('features',) == tuple(dset2.data_vars)
+    >>> assert np.all(dset2.features == arr1)
+    >>> dset2
+    <xarray.MLDataset>
+    Dimensions:   (x: 2, y: 2)
+    Coordinates:
+      * x         (x) int64 0 1
+      * y         (y) int64 2 3
+    Data variables:
+        pressure  (x, y) float64 0.2141 0.7977 0.02092 0.1973
+    '''
+    from xarray_filters.mldataset import MLDataset
+    if arr.ndim > 2:
+        raise ValueError('Expected 2D input arr but found {}'.format(arr.shape))
+    coords, dims = multi_index_to_coords(arr, axis=axis)
+    simple_axis = 0 if axis == 1 else 1
+    simple_dim = arr.dims[simple_axis]
+    simple_np_arr = getattr(arr, simple_dim).values
+    shp = tuple(coords[dim].size for dim in dims)
+    dset = OrderedDict()
+    for j in range(simple_np_arr.size):
+        val = arr[:, j].values.reshape(shp)
+        layer = simple_np_arr[j]
+        dset[layer] = xr.DataArray(val, coords=coords, dims=dims)
+    return MLDataset(dset)
 
 
 def _same_size_dims_arrs(*arrs, raise_err=True):
@@ -140,68 +276,6 @@ def _same_size_dims_arrs(*arrs, raise_err=True):
     return dims, siz
 
 
-def subset_layers(dset, layers):
-    from xarray_filters.ml_features import MLDataset
-    arrs = (dset[layer] for layer in layers
-            if layer in dset.data_vars)
-    new_dset = MLDataset(OrderedDict(zip(layers, arrs)))
-    return new_dset
-
-
-def format_chain_args(trans):
-    '''TODO - Document the list of list structures
-    that can be passed transforms.  See
-    comments in tests/test_reshape.py for now
-
-    Parameters:
-        :trans: "transforms" arguments to MLDataset.chain
-
-    Returns:
-        list of lists like [[func1, args1, kwargs1],
-                            [func2, args2, kwargs2]]
-        to be passed to MLDataset.pipe(func, *args, **kwargs) on
-        each func, args, kwargs.  Note
-    '''
-    output = []
-    if callable(trans):
-        output.append([trans, [], {}])
-    elif isinstance(trans, (tuple, list)):
-        trans = list(trans)
-        for tran in trans:
-            if callable(tran):
-                output.append([tran, [], {}])
-            elif isinstance(tran, (list, tuple)) and tran:
-                tran = list(tran)
-                if isinstance(tran[-1], dict):
-                    kw = tran[-1]
-                    kw_idx = len(tran) - 1
-                else:
-                    kw = dict()
-                    kw_idx = None
-                func = [idx for idx, _ in enumerate(tran)
-                        if isinstance(_, str) or callable(_)]
-                if not func:
-                    raise ValueError('Expected a string DataArray method name or a callable in {}'.format(tran))
-                args = [_ for idx, _ in enumerate(tran)
-                        if idx != kw_idx and idx not in func]
-                func = tran[func[0]]
-                tran = [func, args, kw]
-                output.append(tran)
-    return output
-
-
-def chain(dset, func_args_kwargs, layers=None):
-    from xarray_filters.pipe_utils import for_each_array
-    func_args_kwargs = format_chain_args(func_args_kwargs)
-    if layers is not None:
-        dset = subset_layers(dset, layers=layers)
-    for func, args, kwargs in func_args_kwargs:
-        if not callable(func):
-            func = for_each_array(func)
-        dset = dset.pipe(func, *args, **kwargs)
-    return dset
-
-
 def concat_ml_features(*dsets,
                        features_layer=FEATURES_LAYER,
                        concat_dim=None,
@@ -222,7 +296,7 @@ def concat_ml_features(*dsets,
     '''
 
     # TODO True or False (convention?)
-    from xarray_filters.ml_features import MLDataset
+    from xarray_filters.mldataset import MLDataset
     if not dsets:
         raise ValueError('No MLDataset / Dataset arguments passed.  Expected >= 1')
     if keep_attrs:

@@ -1,19 +1,36 @@
-
 language: python
 
-python:
-  - "3.5"
+dist: trusty
 
 env:
-  - PYTHON_TEST_VERSION=2.7
-  - PYTHON_TEST_VERSION=3.5
-  - PYTHON_TEST_VERSION=3.6
+  global:
+    - CHANNELS=" -c conda-forge "
+
+  matrix:
+    - PYTHON=3.6 NUMPY=1.12
+    - PYTHON=3.5 NUMPY=1.11
+    - PYTHON=2.7 NUMPY=1.11
 
 install:
-  # Name of the environment for testing
-  - export XR_TEST_ENV=xarray-test-env
-  - conda create --name $XR_TEST_ENV xarray numpy pandas scikit-learn
-  - source activate $XR_TEST_ENV
+    - export ENV_NAME="$(echo xf_env_${PYTHON} | sed 's/\.//')"
+    - conda env list | grep $ENV_NAME && conda remove --name $ENV_NAME
+    - conda build --python $PYTHON --numpy $NUMPY conda.recipe
+    - conda create $CHANNELS --name $ENV_NAME python=$PYTHON numpy=$NUMPY xarray_filters
+    - source activate $ENV_NAME
 
 script:
-  - python -c "from xarray_filters.datasets import make_blobs;make_blobs()"
+    - py.test --doctest-modules
+
+notifications:
+  on_success: change
+  on_failure: always
+  flowdock: $FD_TOKEN
+
+deploy:
+  - provider: script
+    script:
+      - conda install --name root anaconda-client && conda build $CHANNELS --output --python $PYTHON --numpy $NUMPY conda.recipe | xargs conda convert -p all -o _pkgs && find _pkgs -type f -name "*.tar.bz2" -exec anaconda -t $ANACONDA_UPLOAD_TOKEN upload --user $ANACONDA_UPLOAD_USER --label dev {} \+
+    on:
+      tags: false
+      all_branches: true
+    skip_cleanup: true

@@ -1,4 +1,5 @@
-from __future__ import absolute_import, division, print_function, unicode_literals
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
 
 from collections import OrderedDict
 from functools import wraps
@@ -13,16 +14,16 @@ __all__ = ['data_vars_func',
 
 
 def _keep_arrays(dset, new_dset):
-    from xarray_filters.ml_features import merge, MLDataset
+    from xarray_filters.mldataset import MLDataset
     to_merge = OrderedDict()
     for layer, arr in dset.data_vars.items():
         if layer not in new_dset.data_vars:
             to_merge[layer] = arr
-    return merge((new_dset, MLDataset(to_merge)))
+    return MLDataset(xr.merge((new_dset, MLDataset(to_merge))))
 
 
 def _prepare_return_val(dset, new_dset, **kw):
-    from xarray_filters.ml_features import MLDataset
+    from xarray_filters.mldataset import MLDataset
     new_dset = MLDataset(new_dset)
     if kw.get('keep_arrays', False):
         new_dset = _keep_arrays(dset, new_dset)
@@ -35,7 +36,7 @@ def _prepare_return_val(dset, new_dset, **kw):
 def data_vars_func(func):
     @wraps(func)
     def new_func(dset=None, *args, **kw):
-        from xarray_filters.ml_features import MLDataset
+        from xarray_filters.mldataset import MLDataset
         new_dset = OrderedDict()
         kwargs = OrderedDict()
         if dset is not None:
@@ -52,7 +53,7 @@ def data_vars_func(func):
 def for_each_array(func):
     @wraps(func)
     def new_func(dset, *args, **kw):
-        from xarray_filters.ml_features import MLDataset
+        from xarray_filters.mldataset import MLDataset
         new_dset = OrderedDict()
         if hasattr(dset, 'data_vars'):
             items = dset.data_vars.items()

@@ -59,7 +59,6 @@ Spec_6 = [('features',
 
 shp = 20, 15, 8, 48
 dims = 'x', 'y', 'z', 't'
-# We are changing "band" to "layer" in Elm / Earthio (band Phase I - satellite mindset)
 TEST_LAYERS = ['temperature', 'wind_x', 'wind_y', 'pressure']
 r = lambda: np.random.uniform(0, 1, shp)
 c = lambda: OrderedDict([(dim, np.arange(s)) for dim, s in zip(dims, shp)])

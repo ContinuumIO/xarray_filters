@@ -1,4 +1,5 @@
-from __future__ import absolute_import, division, print_function, unicode_literals
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
 
 from collections import OrderedDict
 
@@ -10,12 +11,20 @@ __all__ = ['create_multi_index', 'multi_index_to_coords',]
 def create_multi_index(arr):
     '''From DataArray arr make a pandas.MultiIndex for the arr.coords
 
-    Parameters:
-        :arr: xarray.DataArray
+    Parameters
+    ----------
 
-    Returns:
-        :index: pandas.MultiIndex - The MultiIndex has index names
-                taken from arr.dims and levels taken from arr.coords
+    arr: xarray.DataArray
+
+    Returns
+    -------
+
+    index: pandas.MultiIndex instance with index names
+           taken from arr.dims and levels taken from arr.coords
+
+    Examples
+    --------
+
     '''
     np_arrs = tuple(getattr(arr, dim).values for dim in arr.dims)
     index = pd.MultiIndex.from_product(np_arrs, names=arr.dims)
