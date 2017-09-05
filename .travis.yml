@@ -21,7 +21,6 @@ install:
 
     - export ENV_NAME="$(echo xf_env_${PYTHON} | sed 's/\.//')"
     - conda remove --name $ENV_NAME || true
-    - conda build --python $PYTHON --numpy $NUMPY conda.recipe
     - conda create $CHANNELS --name $ENV_NAME python=$PYTHON numpy=$NUMPY xarray_filters
     - source activate $ENV_NAME
 
@@ -37,7 +36,7 @@ notifications:
 deploy:
   - provider: script
     script:
-      - conda install --name root anaconda-client && conda build $CHANNELS --output --python $PYTHON --numpy $NUMPY conda.recipe | xargs conda convert -p all -o _pkgs && find _pkgs -type f -name "*.tar.bz2" -exec anaconda -t $ANACONDA_UPLOAD_TOKEN upload --user $ANACONDA_UPLOAD_USER --label dev {} \+
+      - conda build --python $PYTHON --numpy $NUMPY conda.recipe && conda install --name root anaconda-client && conda build $CHANNELS --output --python $PYTHON --numpy $NUMPY conda.recipe | xargs conda convert -p all -o _pkgs && find _pkgs -type f -name "*.tar.bz2" -exec anaconda -t $ANACONDA_UPLOAD_TOKEN upload --user $ANACONDA_UPLOAD_USER --label dev {} \+
     on:
       tags: false
       all_branches: true
