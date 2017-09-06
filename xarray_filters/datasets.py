@@ -70,12 +70,12 @@ but returns a XyTransformer object that has various methods to postprocess that
 (X, y) data. For example, you can do
 
 >>> m = make_blobs(astype=None)
->>> m.to_dataframe(feature_names=['feat1', 'feat2'], label_name='response')
+>>> m.to_dataframe(xnames=['feat1', 'feat2'], yname='response')
 
 Alternatively, you can do everything in one step
 
->>> m = make_blobs(astype=pandas.DataFrame, feature_names=['feat1', 'feat2'],
-        label_name='response')
+>>> m = make_blobs(astype=pandas.DataFrame, xnames=['feat1', 'feat2'],
+        yname='response')
 
 The signature of `make_blobs` will be just like in sklearn, with the additional
 explicit keyword `astype`, plus a variable set of keywords `**kwargs`.
@@ -122,19 +122,19 @@ class XyTransformer:
         self.X = X  # always a 2d numpy.array
         self.y = y  # always a 1d numpy.array
 
-    def to_array(self, feature_shape=None):
+    def to_array(self, xshape=None):
         "Return X, y NumPy arrays with given shape"
-        if feature_shape:
-            X, y = self.X.reshape(feature_shape), self.y
+        if xshape:
+            X, y = self.X.reshape(xshape), self.y
         else:
             X, y = self.X, self.y
         return X, y
 
-    def to_dataframe(self, feature_names=None, label_name=None):
-        "Return a dataframe X and a label series y with named variables."
-        Xdf = pd.DataFrame(self.X, columns=feature_names)
-        ys = pd.Series(self.y, name=label_name)
-        return Xdf, ys
+    def to_dataframe(self, xnames=None, yname=None):
+        "Return a dataframe with features/labels optionally named."
+        df = pd.DataFrame(self.X, columns=xnames)
+        df[yname] = self.y
+        return df
 
     def to_dataset(self, coords=None, dims=None, attrs=None, shape=None, xnames=None, yname=None):
         """Return an xarray.DataSet with given shape, coords/dims/var names.
