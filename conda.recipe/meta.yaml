@@ -15,9 +15,8 @@ requirements:
 
   run:
     - python
-    - numpy
-    - pandas
     - xarray
+    - scikit-learn
     - six
 
 about:

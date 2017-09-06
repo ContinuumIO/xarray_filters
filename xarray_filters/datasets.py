@@ -69,13 +69,13 @@ If `astype=None`, then the `make_*` function behaves just like in sklearn,
 but returns a XyTransformer object that has various methods to postprocess that
 (X, y) data. For example, you can do
 
+>>> import pandas as pd
 >>> m = make_blobs(astype=None)
->>> m.to_dataframe(xnames=['feat1', 'feat2'], yname='response')
+>>> df = m.to_dataframe(xnames=['feat1', 'feat2'], yname='response')
 
 Alternatively, you can do everything in one step
 
->>> m = make_blobs(astype=pandas.DataFrame, xnames=['feat1', 'feat2'],
-        yname='response')
+>>> m = make_blobs(astype=pd.DataFrame, xnames=['feat1', 'feat2'], yname='response')
 
 The signature of `make_blobs` will be just like in sklearn, with the additional
 explicit keyword `astype`, plus a variable set of keywords `**kwargs`.
@@ -101,8 +101,9 @@ import sklearn.datasets
 import logging
 
 from collections import Sequence, OrderedDict, defaultdict
-from utils import _infer_coords_and_dims
 from functools import partial, wraps
+
+from xarray_filters.utils import _infer_coords_and_dims
 
 logging.basicConfig()
 logger = logging.getLogger(__name__)
