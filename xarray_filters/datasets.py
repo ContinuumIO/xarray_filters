@@ -101,28 +101,12 @@ import sklearn.datasets
 import logging
 
 from collections import Sequence, OrderedDict, defaultdict
+from utils import _infer_coords_and_dims
 from functools import partial, wraps
 
 logging.basicConfig()
 logger = logging.getLogger(__name__)
 
-
-def synthetic_coords(shape, layers, dims):
-    coord_np_arrs = tuple(np.arange(s) for s in shape)
-    space = pd.MultiIndex.from_arrays(coord_np_arrs, names=dims)
-    # TODO use PR 3's constants.py default dimension   # ADDRESS AFTER MERGING INTO MASTER
-    # names rather than hard coding them here
-    coords = OrderedDict([('space', space), ('layer', layers)])
-    dims = ('space', 'layer')
-    return coords, dims
-
-
-OK_METHOD_KW = ('shape', 'dims', 'feature_names',) # FILL THIS OUT ? TODO - Gui?
-# TODO_ANSWER (Gui): checking for acceptable keywords will be done when
-# XyTransformer.astype calls the right `to_*` method (say,
-# XyTransformer.to_dataset) that will then check if those keywords are valid.
-# So no need to define acceptable keywords globally here.
-# Keeping it for now
 
 class XyTransformer:
     "Transforms a pair (feature_matrix, labels_vector) with to_* methods."
@@ -152,39 +136,64 @@ class XyTransformer:
         ys = pd.Series(self.y, name=label_name)
         return Xdf, ys
 
-    def to_dataset(self, layers=None, shape=None, dims=None):
-        """Return an Xarray with layers and space
+    def to_dataset(self, coords=None, dims=None, attrs=None, shape=None, xnames=None, yname=None):
+        """Return an xarray.DataSet with given shape, coords/dims/var names.
 
-        [TODO]: improve this docstring.
+        Parameters
+        ----------
+        coords : sequence or dict of array_like objects, optional
+            Coordinates (tick labels) to use for indexing along each dimension.
+            If dict-like, should be a mapping from dimension names to the
+            corresponding coordinates.
+        dims : str or sequence of str, optional
+            Name(s) of the the data dimension(s). Must be either a string (only
+            for 1D data) or a sequence of strings with length equal to the
+            number of dimensions. If this argument is omitted, dimension names
+            are taken from ``coords`` (if possible) and otherwise default to
+            ``['dim_0', ... 'dim_n']``.
+        attrs : dict_like or None, optional
+            Attributes to assign to the new instance. By default, an empty
+            attribute dictionary is initialized.
+        shape: tuuple, optional
+            Length of each dimension, or equivalently, number of elements in each
+            coordinate.
+        xnames : sequence of str, optional
+            Name given to each feature (column in self.X).
+        yname : str, optional
+            Name given to the label variable (self.y).
 
-        [TODO]: should this be a static method that takes data as input?
+        Returns
+        -------
+        dataset = xarra.Dataset
+            Each feature (column of self.X) and the label (self.y) becomes a
+            data variable in this dataset.
+
+
         """
-        assert self.X.ndim == 2
-        ncols = self.X.shape[1]
-        if shape is None:
-            shape = (self.y.size, 1)
-        if dims is None:
-            defaults = ('x', 'y', 'z', 't')
-            if len(shape) <= len(defaults):
-                dims = defaults[:len(shape)]
-            else:
-                dims = defaults + tuple(s for s in string.ascii_letters if s not in defaults)
-                dims = dims[:len(shape)]
-                assert len(dims) == len(shape)
-        if not layers:
-            layers = ['label_{}'.format(c) for c in range(ncols)]
-        coords, dims = synthetic_coords(self.X.shape, layers, dims)
-        xarr = xr.DataArray(self.X, coords=coords, dims=dims)
-        # TODO xr.Dataset -> MLDataset from PR 3     # ADDRESS AFTER MERGING INTO MASTER
-        dset = xr.Dataset(OrderedDict([('features', xarr)]))
-        return dset, self.y
+        # Obtain coordinates, dimensions, shape, variable names, etc.
+        if not shape:
+            shape = (self.X.shape[0],)
+        new_coords, new_dims = _infer_coords_and_dims(shape, coords, dims)
+        nvars = self.X.shape[1]
+        if not xnames:
+            xnames = ['X' + str(n) for n in range(nvars)]
+        # store features X in dataset
+        ds = xr.Dataset(attrs=attrs)
+        for (xname, col) in zip(xnames, self.X.T):
+            ds[xname] = xr.DataArray(data=col.reshape(shape), coords=new_coords, dims=new_dims)
+        # store label y
+        if not yname:
+            yname = 'y'
+        ds[yname] = xr.DataArray(data=self.y.reshape(shape), coords=new_coords, dims=new_dims)
+        return ds
 
     def to_ml_features(self, layers=None, shape=None, dims=None, **features_kw):
-        dset, _ = self.to_dataset(layers=layers, shape=shape, dims=dims)
-        # TODO - This won't work until PR 3 merge and change  # ADDRESS AFTER MERGING INTO MASTER
-        # is made in above TODO note on MLDataset
-        dset = dset.to_ml_features(**features_kw)
-        return dset, self.y
+        raise NotImplementedError  # waiting on MLDataset availability
+        #dset, _ = self.to_dataset(layers=layers, shape=shape, dims=dims)
+        ## TODO - This won't work until PR 3 merge and change  # ADDRESS AFTER MERGING INTO MASTER
+        ## is made in above TODO note on MLDataset
+        #dset = dset.to_ml_features(**features_kw)
+        #return dset, self.y
 
     def astype(self, to_type, **kwargs):
         """Convert to given type.
@@ -200,8 +209,7 @@ class XyTransformer:
         XyTransformer.to_array
         XyTransformer.to_dataframe
         XyTransformer.to_*
-        ...
-
+        etc...
         """
         assert to_type in self.__class__.accepted_types
         to_method_name = 'to_' + to_type
@@ -249,36 +257,7 @@ def _make_base(skl_sampler_func):
     default_astype = 'dataset'
     def wrapper(*args, **kwargs):
         '''
-        TODO - Gui see if we can do something
-               like this instead so that we don't
-               return an XyTransformer but
-               rather the output of an
-               XyTransformer method
-
-        sk_args, sk_kw = ...do something to get only
-                          args/kwargs that sklearn.dataset
-                          func needs
-        other_args, other_kw = ...do something to get only
-                               args/kwargs related to
-                               XyTransformer
-        Check sklearn docs, but I think that
-            there are no args - just kwargs
-        X, y = skl_sampler_func(*sk_args, **sk_kw)
-        xyt = XyTransformer(X, y)
-        method = .....some way of mapping to the correct
-                      XyTransformer method, like getting
-                      the method out of other_kw - related to "astype"
-        func = getattr(xyt, method)
-        return func(*other_args, **other_kw)
-
-        Some of other_kw -> may be calculated from sk_kw or vice versa?, e.g.
-            sk_kw - n_samples
-            other_kw - shape (must be consistent)
-            Take shape keyword or Exception if n_samples given
-
-        ---
         All optional/custom args are keyword arguments.
-
         '''
         # Step 1: process positional and keyword arguments
         skl_kwds = skl_argspec.args + skl_argspec.kwonlyargs
@@ -376,25 +355,26 @@ Attributes:
     id:       373
     name:     Ariel Sharon
     '''
-    out = sklearn.datasets.fetch_lfw_people(*args, **kw)
-    dset = OrderedDict()
-    name_tracker = defaultdict(lambda: -1)
-    for img, name_id in zip(out.images, out.target):
-        name = out.target_names[name_id]
-        name_tracker[name] += 1
-        clean_name = name.lower().replace(' ', '_') + '_' + str(name_tracker[name])
-        r, c = img.shape
-        coords = OrderedDict([('row', np.arange(r)),
-                              ('column', np.arange(c))])
-        dims = ('row', 'column',)
-        attrs = dict(name=name, id=name_id)
-        data_arr = xr.DataArray(img, coords=coords, dims=dims, attrs=attrs)
-        dset[clean_name] = data_arr
-    attrs = dict(metadata=[args, kw])
-    # TODO - PR 3's MLDataset instead of Dataset
-    dset = xr.Dataset(dset, attrs=attrs)
-    # TODO - allow converting to dataframe, numpy array?
-    return dset
+    raise NotImplementedError
+    #out = sklearn.datasets.fetch_lfw_people(*args, **kw)
+    #dset = OrderedDict()
+    #name_tracker = defaultdict(lambda: -1)
+    #for img, name_id in zip(out.images, out.target):
+    #    name = out.target_names[name_id]
+    #    name_tracker[name] += 1
+    #    clean_name = name.lower().replace(' ', '_') + '_' + str(name_tracker[name])
+    #    r, c = img.shape
+    #    coords = OrderedDict([('row', np.arange(r)),
+    #                          ('column', np.arange(c))])
+    #    dims = ('row', 'column',)
+    #    attrs = dict(name=name, id=name_id)
+    #    data_arr = xr.DataArray(img, coords=coords, dims=dims, attrs=attrs)
+    #    dset[clean_name] = data_arr
+    #attrs = dict(metadata=[args, kw])
+    ## TODO - PR 3's MLDataset instead of Dataset
+    #dset = xr.Dataset(dset, attrs=attrs)
+    ## TODO - allow converting to dataframe, numpy array?
+    #return dset
 
 
 # Convert all sklearn functions that admit conversion
