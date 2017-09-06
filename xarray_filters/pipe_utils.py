@@ -70,7 +70,7 @@ def for_each_array(func):
 
 def call_custom_func(*args, **kwargs):
     assert len(args) > 0, 'xarray_filters.pipe_utils.call_custom_func requires at least one argument'
-    func = args[0]
+    func = args.pop()
     return_args_kw = kwargs.get('return_args_kw', False)
     if not callable(func):
         if args:
