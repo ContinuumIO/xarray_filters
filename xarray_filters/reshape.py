@@ -65,16 +65,14 @@ def has_features(dset, raise_err=True, features_layer=None):
       - y         (space) int64 2 3 2 3
       * layer     (layer) object 'pressure'
     Data variables:
-        features  (space, layer) float64 0.08269 0.5801 0.5294 0.6399
+        ...
     >>> has_features(dset2)
     True
     >>> has_features(dset1, raise_err=False)
     False
     >>> has_features(dset1, raise_err=True)
     Traceback (most recent call last):
-      File "<stdin>", line 1, in <module>
-      File "/Users/psteinberg/Documents/earth/xarray_filters-new/xarray_filters/reshape.py", line 53, in has_features
-        raise ValueError(msg.format(features_layer, FEATURES_LAYER_DIMS))
+        ...
     ValueError: Expected an MLDataset/Dataset with DataArray "features" and dims ('space', 'layer')
     '''
     if features_layer is None:
@@ -143,7 +141,7 @@ def to_features(dset, layers=None, row_dim=None,
     >>> dset = from_features(arr1)
     >>> assert isinstance(dset, MLDataset) and tuple(dset.data_vars) == ('pressure',)
     >>> arr2 = to_features(dset)
-    >>> assert np.all(arr1.values == arr2.values)
+    >>> assert np.all(arr1 == arr2.features)
     >>> arr2
     <xarray.MLDataset>
     Dimensions:   (layer: 1, space: 4)
@@ -153,7 +151,7 @@ def to_features(dset, layers=None, row_dim=None,
       - y         (space) int64 2 3 2 3
       * layer     (layer) object 'pressure'
     Data variables:
-        features  (space, layer) float64 0.9394 0.9805 0.6831 0.7039
+        ...
 
     '''
     from xarray_filters.mldataset import MLDataset
@@ -232,12 +230,14 @@ def from_features(arr, axis=0):
     >>> assert np.all(dset2.features == arr1)
     >>> dset2
     <xarray.MLDataset>
-    Dimensions:   (x: 2, y: 2)
+    Dimensions:   (layer: 1, space: 4)
     Coordinates:
-      * x         (x) int64 0 1
-      * y         (y) int64 2 3
+      * space     (space) MultiIndex
+      - x         (space) int64 0 0 1 1
+      - y         (space) int64 2 3 2 3
+      * layer     (layer) object 'pressure'
     Data variables:
-        pressure  (x, y) float64 0.2141 0.7977 0.02092 0.1973
+      ...
     '''
     from xarray_filters.mldataset import MLDataset
     if arr.ndim > 2:
