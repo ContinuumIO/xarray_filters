@@ -45,11 +45,11 @@ class MLDataset(xr.Dataset):
         '''
         return chain(self, func_args_kwargs, layers=layers)
 
-    def concat_ml_features(self, *dsets,
-                           features_layer=FEATURES_LAYER,
-                           concat_dim=None,
-                           keep_attrs=False):
+    def concat_ml_features(self, *dsets, **kwargs):
         '''TODO - wrap docstring of concat_ml_features'''
+        features_layer = kwargs.get('features_layer', FEATURES_LAYER)
+        concat_dim = kwargs.get('concat_dim', None)
+        keep_attrs = kwargs.get('keep_attrs', False)
         dsets = (self,) + tuple(dsets)
         return concat_ml_features(*dsets,
                                   features_layer=features_layer,

@@ -255,13 +255,14 @@ def from_features(arr, axis=0):
     return MLDataset(dset)
 
 
-def _same_size_dims_arrs(*arrs, raise_err=True):
+def _same_size_dims_arrs(*arrs, **kwargs):
     '''Check if all DataArrays in arrs have same size and same dims
 
     Parameters:
         :raise_err: If True, raise ValueError if dims/sizes differ
                     else return True/False
     '''
+    raise_err = kwargs.get('raise_err', True)
     siz = None
     dims = None
     for arr in arrs:
@@ -276,11 +277,7 @@ def _same_size_dims_arrs(*arrs, raise_err=True):
     return dims, siz
 
 
-def concat_ml_features(*dsets,
-                       features_layer=FEATURES_LAYER,
-                       concat_dim=None,
-                       keep_attrs=False):
-
+def concat_ml_features(*dsets, **kwargs):
     '''Concatenate MLDataset / Dataset (dsets) along concat_dim
     (by default the column dimension, typically called "layer")
 
@@ -292,8 +289,10 @@ def concat_ml_features(*dsets,
         :keep_attrs: If True, keep the attrs of the first dset in *dsets
     TODO - Gui: This could use the astype logic discussed elsewhere?
 
-
     '''
+    features_layer = kwargs.get('features_layer', FEATURES_LAYER)
+    concat_dim = kwargs.get('concat_dim', None)
+    keep_attrs = kwargs.get('keep_attrs', False)
 
     # TODO True or False (convention?)
     from xarray_filters.mldataset import MLDataset
