@@ -1,0 +1,2 @@
+include versioneer.py
+include xarray_filters/_version.py

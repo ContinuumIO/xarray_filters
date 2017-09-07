@@ -1,19 +1,43 @@
-
 language: python
 
-python:
-  - "3.5"
+dist: trusty
 
 env:
-  - PYTHON_TEST_VERSION=2.7
-  - PYTHON_TEST_VERSION=3.5
-  - PYTHON_TEST_VERSION=3.6
+  global:
+    - CHANNELS=" -c conda-forge "
+
+  matrix:
+    - PYTHON=3.6 NUMPY=1.12
+    - PYTHON=3.5 NUMPY=1.11
+    - PYTHON=2.7 NUMPY=1.11
 
 install:
-  # Name of the environment for testing
-  - export XR_TEST_ENV=xarray-test-env
-  - conda create --name $XR_TEST_ENV xarray numpy pandas scikit-learn
-  - source activate $XR_TEST_ENV
+    - wget http://repo.continuum.io/miniconda/Miniconda-latest-Linux-x86_64.sh -O miniconda.sh
+    - bash miniconda.sh -b -p $HOME/miniconda
+    - export PATH="$HOME/miniconda/bin:$PATH"
+    - conda config --set always_yes yes --set changeps1 no
+    - conda update conda
+    - conda install --name root conda-build
+
+    - export ENV_NAME="$(echo xf_env_${PYTHON} | sed 's/\.//')"
+    - conda remove --name $ENV_NAME || true
+    - conda create $CHANNELS --name $ENV_NAME python=$PYTHON numpy=$NUMPY
+    - source activate $ENV_NAME
 
 script:
-  - python -c "from xarray_filters.datasets import make_blobs;make_blobs()"
+    - conda build --python $PYTHON --numpy $NUMPY conda.recipe
+
+notifications:
+  on_success: change
+  on_failure: always
+  flowdock:
+    secure: "qJfMEqTfEE7570pOcfoLzy4MsPBZ43igdR7zeQbOocH2UM5ort3GN1VakX4AnVbsNQREVz2i6lGlOFb7npQAV0Wgh6VTRrRYwuOdHL5P3YTR6p2voZr757BfAW3vaJCpsKLdDyTeFr/8qoD5GsKFzRPhJESrBnk57ll9YyhipYe1tg3RS/xt/EqO9V4bunCHeFYJ7UNEOx9ELDatOD8GeWmrLcgBuEM3B0EOrYr/rRNvjPTYPTq4MAq5k9mNbRWX/Y0KNGo0cPRXdXze5YCSfrhVUIxfDQ17lZeus8CmZsGqcRgmSFd0zV47zuU1uQp+A9DEVTPqVgcwPHBvjBc7YDXO74f6qMhFN2OaBFQcbHr/B64P4Qw0EOcWey2fa9/A7zoIWmMPx72ccJVdcpG761x2ZXM2e6MRcjgBvATPiKFxqwxmQvnGfJIn3hQaiRghbVdju6zK9sQlsDbrLSTvfbZD73httIg7UgKHyhPuErSpfV9TlwWbtnolKtVNlqs5GW/9d3tMZw4XWQCOmc3b3DPDY3Rje2JxW94qiNIleU6/Lo5SlU1sH/+cfB7+WkIQhDuWSdNPNlLU9kqHZTEmkSw5KYjcD5rDxy2Bcv+5mCpR8iUcR1LCvQHj/ov3zoBZgmsWwY2CU/mAddk4Ij609FawKSZ9MlX6Djh0ENJcI6c="
+
+deploy:
+  - provider: script
+    script:
+      - conda install --name root anaconda-client && conda build $CHANNELS --output --python $PYTHON --numpy $NUMPY conda.recipe | sed 's/-py[^_]*/-py\*/' | xargs ls -1 | xargs conda convert -p all -o _pkgs && find _pkgs -type f -name "*.tar.bz2" -exec anaconda -t $ANACONDA_UPLOAD_TOKEN upload --user $ANACONDA_UPLOAD_USER --label dev {} \+
+    on:
+      tags: false
+      all_branches: true
+    skip_cleanup: true
