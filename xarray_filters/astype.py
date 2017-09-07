@@ -8,8 +8,9 @@
 from __future__ import (absolute_import, division,
                         print_function, unicode_literals)
 
-import xarray as xr
 import numpy as np
+import pandas as pd
+import xarray as xr
 
 from xarray_filters.constants import YNAME
 from xarray_filters.utils import _infer_coords_and_dims
