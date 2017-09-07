@@ -6,6 +6,7 @@ from functools import wraps
 
 import xarray as xr
 
+from xarray_filters.astype import TypeTransformerBase, astype
 from xarray_filters.chain import chain
 from xarray_filters.reshape import (to_features,
                                     from_features,
@@ -16,7 +17,7 @@ from xarray_filters.constants import FEATURES_LAYER
 __all__ = ['MLDataset',]
 
 
-class MLDataset(xr.Dataset):
+class MLDataset(xr.Dataset, TypeTransformerBase):
     '''Wraps xarray.Dataset for chainable preprocessors and
     reshaping to feature matricies that may be inputs to
     scikit-learn or similar models
@@ -79,10 +80,13 @@ class MLDataset(xr.Dataset):
             ykw = {col_dim: yname}
             X = arr.isel(**xkw)
             y = arr.isel(**ykw)
-            X, y = X.values, y.values
-            if y1d:
-                y.resize((y.size, 1))
-            return X, y
+            if to_np:
+                X, y = X.values, y.values
+                if y1d:
+                    y.resize((y.size, 1))
+                return X, y
+            else:
+                return X.to_dataframe(), y.to_dataframe()
         else:
             raise ValueError('TODO --- msg?')
 
@@ -90,7 +94,7 @@ class MLDataset(xr.Dataset):
         "Return X, y NumPy arrays with given shape"
         features_layer = self.has_features(raise_err=False)
         dset = self.to_features(features_layer=features_layer, **kw)
-        return self._extract_y_from_features(dset=dset)
+        return self._extract_y_from_features(dset=dset, to_np=True)
 
 
     def to_dataframe(self, layers=None, yname=None):
@@ -105,6 +109,7 @@ class MLDataset(xr.Dataset):
     def to_mldataset(self, *args, **kw):
         return self
 
-    def astype(self, *args, **kw):
-        return astype(self, to_type=None, **kw)
+    #def astype(self, to_type, **kw):
+     #   from xarray_filters.astype import astype
+      #  return astype(self, to_type=to_type, **kw)
 

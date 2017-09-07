@@ -75,6 +75,7 @@ def call_custom_func(*args, **kwargs):
     return_args_kw = kwargs.get('return_args_kw', False)
     if not callable(func):
         if args:
+            arr = args.pop(0)
             args = list(args)
             func = getattr(arr, func)
         else:

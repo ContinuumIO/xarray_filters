@@ -192,7 +192,9 @@ def to_features(dset, layers=None, row_dim=None,
     if not keep_attrs:
         attrs = OrderedDict()
     new_dset = MLDataset(OrderedDict([(features_layer, new_arr)]), attrs=attrs)
-    return new_dset(astype=astype)
+    if astype is not None:
+        return new_dset.astype(to_type=astype)
+    return new_dset
 
 
 def from_features(arr, axis=0):

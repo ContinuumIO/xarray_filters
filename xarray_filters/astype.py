@@ -60,8 +60,10 @@ class TypeTransformerBase:
         self.X = X  # always a 2d numpy.array
         self.y = y  # always a 1d numpy.array
 
-    def astype(self, *args, **kw):
-        return astype(self, to_type=None, **kw)
+    def astype(self, to_type=None, **kw):
+        if to_type is None:
+            return self
+        return astype(self, to_type=to_type, **kw)
 
 class NpXyTransformer(TypeTransformerBase):
 

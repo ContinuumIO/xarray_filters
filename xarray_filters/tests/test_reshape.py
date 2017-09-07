@@ -85,8 +85,9 @@ def test_data_vars_keywords_varkw():
     @data_vars_func
     def example(**kw):
         for layer, arr in kw.items():
-            assert layer in X.data_vars
-            assert isinstance(X[layer], xr.DataArray)
+            if isinstance(arr, xr.DataArray):
+                assert layer in X.data_vars
+                assert isinstance(X[layer], xr.DataArray)
         mag = (kw['wind_x'] ** 2 + kw['wind_y'] ** 2) ** 0.5
         return MLDataset(OrderedDict([(name, mag)]))
     X2 = X.chain([example])
