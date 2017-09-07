@@ -15,42 +15,24 @@ to the following containers
     numpy.array
     pandas.DataFrame
 
-as well as allowing us to do some postprocessing of the data conveniently.
+as well as allowing us to do some simple postprocessing of the data
+conveniently, like reshaping naming variables, dimensions, etc.
 
 The idea is to provide drop-in replacements for the `sklearn.make_*` functions
-but with optional keyword arguments, chiefly among them `astype` that defines
-the type of the data structure, as well as other keywords (that interact with
-the `astype` keyword argument).
-
-Note: we focus on the `make_*` functions that output a tuple (X, y)
-where
-
-    X is a n_samples by n_features numpy.array of features
-    y is a n_samples numpy.array of labels
-    make_f can be called without any user-supplied arguments (default only)
-
-For example, in scikit-levar version 0.18.1, the following `make_*` routines
-can be called with defaults only, but do _not_ return X, y:
-
-- `make_low_rank_matrix`
-- `make_sparse_spd_matrix`
-
-The following `make_*` functions cannot be called with defaults only:
-
-- `make_biclusters`
-- `make_checkerboard`
-- `make_sparse_coded_signal`
-- `make_spd_matrix`
+but with additional features, especially around producing multidimensional
+data.
 
 
 Why this is useful
 ------------------
 
-The reasons to wrap the sklearn routines are:
+In natural sciences higher-dimensional data is common, and using labeled
+dimensions and coordinates (tick labels) makes it much easy to work with the
+data.
 
-- We want new types easily (xarray.Dataset, etc.)
-- We want multidimensional features.
-- We want to generate sample weights together with synthetic data.
+In other words, we would like the data simulation capabilities from
+sklearn.datasets, but returning xarray.Dataset objects. While we are at it, we
+might as well support other data structures too, like pandas.DataFrame.
 
 Motivating usecases:
 
@@ -58,35 +40,74 @@ Motivating usecases:
   3d-spatial coordinates and time based on earlier measurements at nearby/same
   coordinates.
 
-Approach
---------
 
-The idea here is to redefine in this module the sklearn functions mentioned
-above. Each one of the new functions has the same signature as in sklearn, as
-well as some additional, optional keywords, chiefly among them `astype`. 
+Implementation Notes
+--------------------
 
-If `astype=None`, then the `make_*` function behaves just like in sklearn, 
-but returns a XyTransformer object that has various methods to postprocess that
-(X, y) data. For example, you can do
+We create new data simulation functions based on the original sklearn ones.
+Each one of the new functions has the same signature as in sklearn, as well as
+some additional, optional keyword-only arguments:
 
->>> import pandas as pd
->>> m = make_blobs(astype=None)
->>> df = m.to_dataframe(xnames=['feat1', 'feat2'], yname='response')
+- `astype` to cast the data to different types (defaults to `xarray.Dataset`)
+- `**kwargs` with optional keyword arguments that depend on what is passed to
+  `astype`.
 
-Alternatively, you can do everything in one step
+For example, to obtain the exact same behavior as in sklearn, you can pass
+`astype='array'`:
 
->>> m = make_blobs(astype=pd.DataFrame, xnames=['feat1', 'feat2'], yname='response')
+To support all the conversions, we create a class `XyTransformer` that has one
+method (`to_array`, `to_dataset`, `to_dataframe`, etc.) per conversion. In
+addition, we implement a `_make_base` function that maps a
+`sklearn.datasets.make_*` function to the new, extended version, with
+appropriate docstring and signature.
 
-The signature of `make_blobs` will be just like in sklearn, with the additional
-explicit keyword `astype`, plus a variable set of keywords `**kwargs`.
+In a nutshell, the higher level API is like
 
-The signature of `m.to_dataframe` will have the proper documentation for that
-method, without any variable set of arguments or keyword arguments.
+>>> m = make_blobs(n_samples=5, n_features=2,  # sklearn args
+...     astype='dataset', xnames=['feat_1', 'feat_2'])  # new args
 
-By default, `astype=xarray.DataSet` in which case the function behaves exactly
-like in sklearn.
+At a lower level, that is equivalent to
 
-TODO: should we have xtype and ytype instead of astype?
+>>> make_blobs = _make_base(sklearn.datasets.make_blobs)
+>>> transformer = make_blobs(astype=None)  # this is a XyTransformer object
+>>> m = transformer.to_dataset(xnames=['feat_1', 'feat_2'])
+
+The full list of converted functions from sklearn is in converted_make_funcs:
+>>> sorted(converted_make_funcs.keys())  # doctest: +NORMALIZE_WHITESPACE
+['make_blobs',
+ 'make_circles',
+ 'make_classification',
+ 'make_friedman1',
+ 'make_friedman2',
+ 'make_friedman3',
+ 'make_gaussian_quantiles',
+ 'make_hastie_10_2',
+ 'make_low_rank_matrix',
+ 'make_moons',
+ 'make_multilabel_classification',
+ 'make_regression',
+ 'make_s_curve',
+ 'make_sparse_spd_matrix',
+ 'make_sparse_uncorrelated',
+ 'make_swiss_roll']
+
+The full list of types that can be used for conversion (i.e. can be passed to
+the keyword `astype`) is
+>>> XyTransformer.accepted_types
+('array', 'dataframe', 'dataset')
+
+
+---
+
+
+
+
+The `make_*` functions created in this module are created automatically by the
+function `_make_base`. For example
+
+>>> make_classification = _make_base(sklearn.datasets.make_classification)
+
+
 """
 
 
@@ -103,7 +124,7 @@ import logging
 from collections import Sequence, OrderedDict, defaultdict
 from functools import partial, wraps
 
-from xarray_filters.utils import _infer_coords_and_dims
+from . utils import _infer_coords_and_dims
 
 logging.basicConfig()
 logger = logging.getLogger(__name__)
@@ -124,7 +145,33 @@ class XyTransformer:
         self.y = y  # always a 1d numpy.array
 
     def to_array(self, xshape=None):
-        "Return X, y NumPy arrays with given shape"
+        """Return X, y NumPy arrays with given shape
+
+        Parameters
+        ----------
+        xshape: tuple
+            Desired shape for the resulting feature array.
+
+        Returns
+        -------
+        X: numpy.ndarray
+            Feature array with shape `xshape` is `xshape` is supplied,
+            otherwise the original shape of self.X.
+        y: numpy.ndarray
+            One dimensional array of labels for the data (the variable we are
+            trying to predict).
+
+        Examples
+        --------
+        >>> transformer = make_blobs(n_samples=4, n_features=3, random_state=0,
+        ...     astype=None)
+        >>> X, y = transformer.to_array()
+        >>> X.shape
+        (4, 3)
+        >>> X, y = transformer.to_array(xshape=(6, 2))
+        >>> X.shape
+        (6, 2)
+        """
         if xshape:
             X, y = self.X.reshape(xshape), self.y
         else:
@@ -132,7 +179,35 @@ class XyTransformer:
         return X, y
 
     def to_dataframe(self, xnames=None, yname=None):
-        "Return a dataframe with features/labels optionally named."
+        """Return a single dataframe with features, labels optionally named.
+
+        Parameters
+        ----------
+        xnames: sequence of str
+            Feature names.
+        yname: str
+            Name of the label variable (variable we are trying to predict).
+
+        Returns
+        -------
+        df: pandas.DataFrame
+            One column per feature, the last column is the label.
+
+        Examples
+        --------
+        >>> transformer = make_regression(n_samples=5, n_features=2, random_state=0,
+        ...     astype=None)
+        >>> df = transformer.to_dataframe(xnames=['temp', 'pressure'], yname='humidity')
+        >>> type(df)
+        <class 'pandas.core.frame.DataFrame'>
+        >>> df.columns
+        Index(['temp', 'pressure', 'humidity'], dtype='object')
+        """
+        nfeatures = self.X.shape[1]
+        if not xnames:
+            xnames = ['X' + str(n) for n in range(nfeatures)]
+        if not yname:
+            yname = 'y'
         df = pd.DataFrame(self.X, columns=xnames)
         df[yname] = self.y
         return df
@@ -175,9 +250,9 @@ class XyTransformer:
         if not shape:
             shape = (self.X.shape[0],)
         new_coords, new_dims = _infer_coords_and_dims(shape, coords, dims)
-        nvars = self.X.shape[1]
+        nfeatures = self.X.shape[1]
         if not xnames:
-            xnames = ['X' + str(n) for n in range(nvars)]
+            xnames = ['X' + str(n) for n in range(nfeatures)]
         # store features X in dataset
         ds = xr.Dataset(attrs=attrs)
         for (xname, col) in zip(xnames, self.X.T):
@@ -219,29 +294,90 @@ class XyTransformer:
 
 
 def _make_base(skl_sampler_func):
-    """Maps a make_* function from sklearn to a XyTransformer
+    """Maps a make_* function from sklearn.datasets to an extension.
+
+    The extended version of the function implements transformations through the
+    various `XyTransformer.to_*` methods, enabled in the new function via the
+    `astype` keyword and additional, optional keyword arguments.
 
     The goal is to use the make_* functions from sklearn to generate the data,
     but then postprocess it with the various to_* methods from a XyTransformer
     class.
 
-    Note: a decorator doesn't solve this. It could add the functionality, but
-    it would not change the docstring or the signature of the function, as it
-    would keep the original one from the wrapped function from sklearn. So we
-    have to do the process manually.
+    Parameters
+    ----------
+    skl_sampler_func: a make_* function from sklearn.datasets
 
-    TODO - Gui - Ensure the default data structures returned are:
-      * X -> MLDataset from PR 3 (xr.Dataset for now)   # ADDRESS AFTER MERGING INTO MASTER
-      * y -> Should be a numpy 1-D array
-        * TODO - Gui - after this PR is merged, make an issue
-          in xarray_filters to support different data structures
-          for y - eventually y may be a DataArray, Series,
-          * See scikit-learn docs - warnings - do we want a 1-D array for
-          y into scikit-learn or do we want a 2-D array for y that
-          has only 1 column.  (.squeeze?)
-            * Try to summarize plan for what shape y should be
-              for most methods - we'll need to standardize y   # ADDRESS AFTER MERGING INTO MASTER
-              in the final step of any chained transformers    # FOR NOW Y WILL BE 1D
+    Returns
+    -------
+    wrapper: a function that extends skl_sampler_func
+
+    Notes
+    -----
+    - The signature of the new function is the same signature as the original
+      sklearn function with the addition of some keyword-only arguments. This
+      facilitates introspection and is useful when calling help() on the new
+      function.
+    - The docstring for the new function is automatically generated to provide all
+      the information the user needs to use the infuction: what can be passed to
+      `astype`, where to find the valid keywords for a given type: in
+      `XyTransformer.to_dataset` for `astype='dataset'`, etc.
+    - A decorator doesn't solve this. It could add the functionality, but it
+      would not change the docstring or the signature of the function, as it
+      would keep the original one from the wrapped function from sklearn. So we
+      have to do the process manually.
+
+    Examples
+    --------
+    The functions we create generate the same data as the corresponding sklearn
+    functions.
+
+    >>> make_classification = _make_base(sklearn.datasets.make_classification)
+    >>> Xskl, yskl = sklearn.datasets.make_classification(random_state=0)
+    >>> our_data = make_classification(random_state=0)
+    >>> np.allclose(Xskl[:, 0], our_data['X0'])  # comparing floats
+    True
+    >>> np.allclose(Xskl[:, 1], our_data['X1'])  # comparing floats
+    True
+
+    Same goes for other features, as well as the label
+
+    >>> np.all(np.equal(yskl, our_data['y']))  # comparing ints
+    True
+
+    The signature of each wrapper is identical to its sklearn equivalent, with
+    the addition of the `astype` keyword and additional, optional keywords to
+    go with `astype`
+
+    >>> inspect.signature(sklearn.datasets.make_classification)  # doctest: +NORMALIZE_WHITESPACE
+    <Signature (n_samples=100, n_features=20, n_informative=2, n_redundant=2,
+    n_repeated=0, n_classes=2, n_clusters_per_class=2, weights=None,
+    flip_y=0.01, class_sep=1.0, hypercube=True, shift=0.0, scale=1.0,
+    shuffle=True, random_state=None)>
+    >>> inspect.signature(make_classification)  # doctest: +NORMALIZE_WHITESPACE
+    <Signature (n_samples=100, n_features=20, n_informative=2, n_redundant=2,
+    n_repeated=0, n_classes=2, n_clusters_per_class=2, weights=None,
+    flip_y=0.01, class_sep=1.0, hypercube=True, shift=0.0, scale=1.0,
+    shuffle=True, random_state=None, *, astype='dataset', **kwargs)>
+
+    If `astype=None`, then the `make_*` function behaves just like in sklearn, 
+    but returns a XyTransformer object that has various methods to postprocess that
+    (X, y) data. For example, we can generate a dataframe of simulated data for
+    a regression exercise with
+
+    >>> df1 = make_regression(n_samples=5, n_features=2, random_state=0,
+    ...     astype='dataframe', xnames=['thing1', 'thing2'])
+
+    or, equivalently,
+
+    >>> transformer = make_regression(n_samples=5, n_features=2, random_state=0,
+    ...     astype=None)  #  this is a XyTransformer object
+    >>> df2 = transformer.to_dataframe(xnames=['thing1', 'thing2'])
+
+    Verifying:
+
+    >>> np.allclose(df1, df2)  # comparing floats
+    True
     """
     skl_argspec = inspect.getfullargspec(skl_sampler_func)
     # Here is where we use the assumption that the make_* function from sklearn

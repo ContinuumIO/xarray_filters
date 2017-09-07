@@ -12,3 +12,4 @@ from xarray_filters.chain import *
 from xarray_filters.multi_index import *
 from xarray_filters.pipe_utils import *
 from xarray_filters.reshape import *
+from xarray_filters.datasets import *
