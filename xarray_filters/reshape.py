@@ -67,7 +67,6 @@ def has_features(dset, raise_err=True, features_layer=None):
     >>> has_features(dset2)
     'features'
     >>> has_features(dset1, raise_err=False)
-    None
     >>> has_features(dset1, raise_err=True)
     Traceback (most recent call last):
         ...
