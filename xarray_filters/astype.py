@@ -40,7 +40,8 @@ def astype(obj, to_type, **kwargs):
     MLDataset.to_*
     etc...
     """
-    assert to_type in obj.__class__.accepted_types
+    if not str(to_type) in obj.__class__.accepted_types:
+        raise ValueError('TODO - msg? - {} {}'.format(to_type, obj))
     to_method_name = 'to_' + to_type
     to_method = obj.__getattribute__(to_method_name)
     return to_method(**kwargs)
