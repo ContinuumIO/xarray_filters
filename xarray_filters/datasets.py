@@ -63,19 +63,19 @@ Approach
 
 The idea here is to redefine in this module the sklearn functions mentioned
 above. Each one of the new functions has the same signature as in sklearn, as
-well as some additional, optional keywords, chiefly among them `astype`. 
+well as some additional, optional keywords, chiefly among them `astype`.
 
-If `astype=None`, then the `make_*` function behaves just like in sklearn, 
-but returns a XyTransformer object that has various methods to postprocess that
+If `astype=None`, then the `make_*` function behaves just like in sklearn,
+but returns a NpXyTransformer object that has various methods to postprocess that
 (X, y) data. For example, you can do
 
 >>> import pandas as pd
 >>> m = make_blobs(astype=None)
->>> df = m.to_dataframe(xnames=['feat1', 'feat2'], yname='response')
+>>> df = m.to_dataframe(layers=['feat1', 'feat2'], yname='response')
 
 Alternatively, you can do everything in one step
 
->>> m = make_blobs(astype=pd.DataFrame, xnames=['feat1', 'feat2'], yname='response')
+>>> m = make_blobs(astype=pd.DataFrame, layers=['feat1', 'feat2'], yname='response')
 
 The signature of `make_blobs` will be just like in sklearn, with the additional
 explicit keyword `astype`, plus a variable set of keywords `**kwargs`.
@@ -103,126 +103,17 @@ import logging
 from collections import Sequence, OrderedDict, defaultdict
 from functools import partial, wraps
 
-from xarray_filters.utils import _infer_coords_and_dims
+from xarray_filters.astype import NpXyTransformer
 
 logging.basicConfig()
 logger = logging.getLogger(__name__)
 
 
-class XyTransformer:
-    "Transforms a pair (feature_matrix, labels_vector) with to_* methods."
-    # Transform methods are to_f where f in accepted types
-    accepted_types = ('array', 'dataframe', 'dataset') 
-
-    def __init__(self, X, y=None):
-        """Initalizes an XyTransformer object.
-
-        Access the underlying feature matrix X and labels y with self.X and
-        self.y, respectively.
-        """
-        self.X = X  # always a 2d numpy.array
-        self.y = y  # always a 1d numpy.array
-
-    def to_array(self, xshape=None):
-        "Return X, y NumPy arrays with given shape"
-        if xshape:
-            X, y = self.X.reshape(xshape), self.y
-        else:
-            X, y = self.X, self.y
-        return X, y
-
-    def to_dataframe(self, xnames=None, yname=None):
-        "Return a dataframe with features/labels optionally named."
-        df = pd.DataFrame(self.X, columns=xnames)
-        df[yname] = self.y
-        return df
-
-    def to_dataset(self, coords=None, dims=None, attrs=None, shape=None, xnames=None, yname=None):
-        """Return an xarray.DataSet with given shape, coords/dims/var names.
-
-        Parameters
-        ----------
-        coords : sequence or dict of array_like objects, optional
-            Coordinates (tick labels) to use for indexing along each dimension.
-            If dict-like, should be a mapping from dimension names to the
-            corresponding coordinates.
-        dims : str or sequence of str, optional
-            Name(s) of the the data dimension(s). Must be either a string (only
-            for 1D data) or a sequence of strings with length equal to the
-            number of dimensions. If this argument is omitted, dimension names
-            are taken from ``coords`` (if possible) and otherwise default to
-            ``['dim_0', ... 'dim_n']``.
-        attrs : dict_like or None, optional
-            Attributes to assign to the new instance. By default, an empty
-            attribute dictionary is initialized.
-        shape: tuuple, optional
-            Length of each dimension, or equivalently, number of elements in each
-            coordinate.
-        xnames : sequence of str, optional
-            Name given to each feature (column in self.X).
-        yname : str, optional
-            Name given to the label variable (self.y).
-
-        Returns
-        -------
-        dataset = xarra.Dataset
-            Each feature (column of self.X) and the label (self.y) becomes a
-            data variable in this dataset.
-
-
-        """
-        # Obtain coordinates, dimensions, shape, variable names, etc.
-        if not shape:
-            shape = (self.X.shape[0],)
-        new_coords, new_dims = _infer_coords_and_dims(shape, coords, dims)
-        nvars = self.X.shape[1]
-        if not xnames:
-            xnames = ['X' + str(n) for n in range(nvars)]
-        # store features X in dataset
-        ds = xr.Dataset(attrs=attrs)
-        for (xname, col) in zip(xnames, self.X.T):
-            ds[xname] = xr.DataArray(data=col.reshape(shape), coords=new_coords, dims=new_dims)
-        # store label y
-        if not yname:
-            yname = 'y'
-        ds[yname] = xr.DataArray(data=self.y.reshape(shape), coords=new_coords, dims=new_dims)
-        return ds
-
-    def to_ml_features(self, layers=None, shape=None, dims=None, **features_kw):
-        raise NotImplementedError  # waiting on MLDataset availability
-        #dset, _ = self.to_dataset(layers=layers, shape=shape, dims=dims)
-        ## TODO - This won't work until PR 3 merge and change  # ADDRESS AFTER MERGING INTO MASTER
-        ## is made in above TODO note on MLDataset
-        #dset = dset.to_ml_features(**features_kw)
-        #return dset, self.y
-
-    def astype(self, to_type, **kwargs):
-        """Convert to given type.
-
-        self.astype(f, **kwargs) calls self.to_f(**kwargs)
-
-        Valid types are in XyTransformer.accepted_types.
-
-        See Also
-        --------
-
-        XyTransformer.to_dataset
-        XyTransformer.to_array
-        XyTransformer.to_dataframe
-        XyTransformer.to_*
-        etc...
-        """
-        assert to_type in self.__class__.accepted_types
-        to_method_name = 'to_' + to_type
-        to_method = self.__getattribute__(to_method_name)
-        return to_method(**kwargs)
-
-
 def _make_base(skl_sampler_func):
-    """Maps a make_* function from sklearn to a XyTransformer
+    """Maps a make_* function from sklearn to a NpXyTransformer
 
     The goal is to use the make_* functions from sklearn to generate the data,
-    but then postprocess it with the various to_* methods from a XyTransformer
+    but then postprocess it with the various to_* methods from a NpXyTransformer
     class.
 
     Note: a decorator doesn't solve this. It could add the functionality, but
@@ -236,8 +127,6 @@ def _make_base(skl_sampler_func):
         * TODO - Gui - after this PR is merged, make an issue
           in xarray_filters to support different data structures
           for y - eventually y may be a DataArray, Series,
-          * See scikit-learn docs - warnings - do we want a 1-D array for
-          y into scikit-learn or do we want a 2-D array for y that
           has only 1 column.  (.squeeze?)
             * Try to summarize plan for what shape y should be
               for most methods - we'll need to standardize y   # ADDRESS AFTER MERGING INTO MASTER
@@ -266,9 +155,9 @@ def _make_base(skl_sampler_func):
         skl_kwargs = {k: val for (k, val) in kwargs.items() if k in skl_kwds}
         astype = kwargs.get('astype', default_astype)
         type_kwargs = {k: val for (k, val) in kwargs.items() if (k not in
-            skl_kwds and k != 'astype')} 
+            skl_kwds and k != 'astype')}
 
-        # Step 2: obtain the XyTransformer object
+        # Step 2: obtain the NpXyTransformer object
         # First we need to check that we can handle the output of skl_sampler_func
         out = skl_sampler_func(*args, **skl_kwargs)
         if len(out) != 2:
@@ -280,7 +169,7 @@ def _make_base(skl_sampler_func):
                 raise ValueError("Y must have dimension 1.")
             if X.shape[0] != y.shape[0]:
                 raise ValueError('X and y must have the same number of rows')
-        Xyt = XyTransformer(X, y)
+        Xyt = NpXyTransformer(X, y)
 
         # Step 3: convert the data to the desired type
         if astype is None:
@@ -300,12 +189,12 @@ def _make_base(skl_sampler_func):
     keyword-only arguments:
 
     astype: str
-        One of {accepted_types} or None to return an XyTransformer. See documentation
-        of XyTransformer.astype.
-        
+        One of {accepted_types} or None to return an NpXyTransformer. See documentation
+        of NpXyTransformer.astype.
+
     **kwargs: dict
         Optional arguments that depend on astype. See documentation of
-        XyTransformer.astype. 
+        NpXyTransformer.astype.
 
     See Also
     --------
@@ -314,8 +203,8 @@ def _make_base(skl_sampler_func):
 
     """.format(
             skl_funcname=(skl_sampler_func.__module__ + '.' + skl_sampler_func.__name__),
-            xy_transformer=(XyTransformer.__module__ + '.' + XyTransformer.__name__),
-            accepted_types=(str(XyTransformer.accepted_types))
+            xy_transformer=(NpXyTransformer.__module__ + '.' + NpXyTransformer.__name__),
+            accepted_types=(str(NpXyTransformer.accepted_types))
 
     )
     wrapper.__doc__ = preamble_doc # + skl_sampler_func.__doc__
@@ -387,9 +276,9 @@ for func_name in sklearn_make_funcs:
         converted_make_funcs[func_name] = _make_base(func)
     except (ValueError, AssertionError) as e:
         warning_msg = "Cannot convert function {}. ".format(func_name) + str(e)
-        logger.warning(warning_msg)
+        logger.info(warning_msg)
 globals().update(converted_make_funcs)  # careful with overwrite here
 
 
-extras = ['XyTransformer', 'fetch_lfw_people']
+extras = ['NpXyTransformer', 'fetch_lfw_people']
 __all__ = list(converted_make_funcs) + extras

@@ -70,12 +70,12 @@ def for_each_array(func):
 
 def call_custom_func(*args, **kwargs):
     assert len(args) > 0, 'xarray_filters.pipe_utils.call_custom_func requires at least one argument'
-    func = args.pop()
+    args = list(args)
+    func = args.pop(0)
     return_args_kw = kwargs.get('return_args_kw', False)
     if not callable(func):
         if args:
             args = list(args)
-            arr = args.pop(0)
             func = getattr(arr, func)
         else:
             raise ValueError('TODO -improve message- expected a DataArray in *args')

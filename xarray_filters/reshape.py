@@ -14,7 +14,6 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 
-from xarray_filters.astype import ml_features_astype
 from xarray_filters.constants import FEATURES_LAYER_DIMS, FEATURES_LAYER
 from xarray_filters.multi_index import create_multi_index, multi_index_to_coords
 from xarray_filters.pipe_utils import for_each_array, call_custom_func
@@ -22,8 +21,7 @@ from xarray_filters.pipe_utils import for_each_array, call_custom_func
 __all__ = ['has_features',
            'concat_ml_features',
            'from_features',
-           'to_features',
-           ]
+           'to_features',]
 
 
 def has_features(dset, raise_err=True, features_layer=None):
@@ -39,7 +37,7 @@ def has_features(dset, raise_err=True, features_layer=None):
     Returns
     -------
 
-    ``True``, ``False`` or, if ``raise_err`` raises ``ValueError``
+    features_layer (str), ``False`` or, if ``raise_err`` raises ``ValueError``
 
     Examples
     --------
@@ -67,9 +65,9 @@ def has_features(dset, raise_err=True, features_layer=None):
     Data variables:
         ...
     >>> has_features(dset2)
-    True
+    'features'
     >>> has_features(dset1, raise_err=False)
-    False
+    None
     >>> has_features(dset1, raise_err=True)
     Traceback (most recent call last):
         ...
@@ -83,8 +81,8 @@ def has_features(dset, raise_err=True, features_layer=None):
         if raise_err:
             raise ValueError(msg.format(features_layer, FEATURES_LAYER_DIMS))
         else:
-            return False
-    return True
+            return None
+    return features_layer
 
 
 def to_features(dset, layers=None, row_dim=None,
@@ -194,7 +192,7 @@ def to_features(dset, layers=None, row_dim=None,
     if not keep_attrs:
         attrs = OrderedDict()
     new_dset = MLDataset(OrderedDict([(features_layer, new_arr)]), attrs=attrs)
-    return ml_features_astype(new_dset, astype=astype)
+    return new_dset(astype=astype)
 
 
 def from_features(arr, axis=0):

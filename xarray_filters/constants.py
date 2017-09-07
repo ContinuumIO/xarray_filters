@@ -5,3 +5,5 @@ __all__ = ['FEATURES_LAYER', 'FEATURES_LAYER_DIMS']
 
 FEATURES_LAYER = 'features'
 FEATURES_LAYER_DIMS = ('space', 'layer',)
+YNAME = 'y'
+

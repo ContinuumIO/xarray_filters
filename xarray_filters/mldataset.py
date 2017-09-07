@@ -59,4 +59,52 @@ class MLDataset(xr.Dataset):
     def has_features(self, *args, **kwargs):
         return has_features(self, *args, **kwargs)
 
+    def _guess_yname(self, features_layer=None):
+        if yname is None:
+            yname = YNAME
+        return yname
+
+    def _extract_y_from_features(self, dset=None,
+                                 yname=None, y1d=True, as_np=True):
+        features_layer = has_features(features_layer=features_layer)
+        if dset is None:
+            dset = self
+        if features_layer:
+            arr = dset[features_layer]
+            col_dim = arr.dims[1]
+            col_labels = getattr(arr, col_dim)
+            idxes = [col for col, item in enumerate(col_labels)
+                     if col != yname]
+            xkw = {col_dim: idxes}
+            ykw = {col_dim: yname}
+            X = arr.isel(**xkw)
+            y = arr.isel(**ykw)
+            X, y = X.values, y.values
+            if y1d:
+                y.resize((y.size, 1))
+            return X, y
+        else:
+            raise ValueError('TODO --- msg?')
+
+    def to_array(self, features_layer=None, **kw):
+        "Return X, y NumPy arrays with given shape"
+        features_layer = self.has_features(raise_err=False)
+        dset = self.to_features(features_layer=features_layer, **kw)
+        return self._extract_y_from_features(dset=dset)
+
+
+    def to_dataframe(self, layers=None, yname=None):
+        "Return a dataframe with features/labels optionally named."
+        features_layer = self.has_features(raise_err=False)
+        df[yname] = self.y
+        return df
+
+    def to_dataset(self, *args, **kw):
+        return xr.Dataset(self)
+
+    def to_mldataset(self, *args, **kw):
+        return self
+
+    def astype(self, *args, **kw):
+        return astype(self, to_type=None, **kw)
 
