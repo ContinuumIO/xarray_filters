@@ -55,7 +55,7 @@ some additional, optional keyword-only arguments:
 For example, to obtain the exact same behavior as in sklearn, you can pass
 `astype='array'`:
 
-To support all the conversions, we create a class `XyTransformer` that has one
+To support all the conversions, we create a class `NpXyTransformer` that has one
 method (`to_array`, `to_dataset`, `to_dataframe`, etc.) per conversion. In
 addition, we implement a `_make_base` function that maps a
 `sklearn.datasets.make_*` function to the new, extended version, with
@@ -69,7 +69,7 @@ In a nutshell, the higher level API is like
 At a lower level, that is equivalent to
 
 >>> make_blobs = _make_base(sklearn.datasets.make_blobs)
->>> transformer = make_blobs(astype=None)  # this is a XyTransformer object
+>>> transformer = make_blobs(astype=None)  # this is a NpXyTransformer object
 >>> m = transformer.to_dataset(xnames=['feat_1', 'feat_2'])
 
 The full list of converted functions from sklearn is in converted_make_funcs:
@@ -93,19 +93,8 @@ The full list of converted functions from sklearn is in converted_make_funcs:
 
 The full list of types that can be used for conversion (i.e. can be passed to
 the keyword `astype`) is
->>> XyTransformer.accepted_types
-('array', 'dataframe', 'dataset')
-
-
----
-
-
-
-
-The `make_*` functions created in this module are created automatically by the
-function `_make_base`. For example
-
->>> make_classification = _make_base(sklearn.datasets.make_classification)
+>>> NpXyTransformer.accepted_types
+('array', 'dataframe', 'dataset', 'mldataset')
 
 
 """
@@ -125,18 +114,22 @@ from collections import Sequence, OrderedDict, defaultdict
 from functools import partial, wraps
 
 from . utils import _infer_coords_and_dims
+from . mldataset import MLDataset
+
+
 
 logging.basicConfig()
 logger = logging.getLogger(__name__)
 
 
-class XyTransformer:
+class NpXyTransformer:
     "Transforms a pair (feature_matrix, labels_vector) with to_* methods."
     # Transform methods are to_f where f in accepted types
-    accepted_types = ('array', 'dataframe', 'dataset') 
+    accepted_types = ('array', 'dataframe', 'dataset', 'mldataset')
+    default_type = 'mldataset'
 
     def __init__(self, X, y=None):
-        """Initalizes an XyTransformer object.
+        """Initalizes an NpXyTransformer object.
 
         Access the underlying feature matrix X and labels y with self.X and
         self.y, respectively.
@@ -263,28 +256,30 @@ class XyTransformer:
         ds[yname] = xr.DataArray(data=self.y.reshape(shape), coords=new_coords, dims=new_dims)
         return ds
 
-    def to_ml_features(self, layers=None, shape=None, dims=None, **features_kw):
-        raise NotImplementedError  # waiting on MLDataset availability
-        #dset, _ = self.to_dataset(layers=layers, shape=shape, dims=dims)
-        ## TODO - This won't work until PR 3 merge and change  # ADDRESS AFTER MERGING INTO MASTER
-        ## is made in above TODO note on MLDataset
-        #dset = dset.to_ml_features(**features_kw)
-        #return dset, self.y
+    def to_mldataset(self, coords=None, dims=None, attrs=None, shape=None, layers=None, yname=None):
+        '''TODO docs as above ^^'''
+        dset = self.to_dataset(coords=coords,
+                               dims=dims,
+                               attrs=attrs,
+                               shape=shape,
+                               xnames=layers,
+                               yname=yname)
+        return MLDataset(dset)
 
     def astype(self, to_type, **kwargs):
         """Convert to given type.
 
         self.astype(f, **kwargs) calls self.to_f(**kwargs)
 
-        Valid types are in XyTransformer.accepted_types.
+        Valid types are in NpXyTransformer.accepted_types.
 
         See Also
         --------
 
-        XyTransformer.to_dataset
-        XyTransformer.to_array
-        XyTransformer.to_dataframe
-        XyTransformer.to_*
+        NpXyTransformer.to_dataset
+        NpXyTransformer.to_array
+        NpXyTransformer.to_dataframe
+        NpXyTransformer.to_*
         etc...
         """
         assert to_type in self.__class__.accepted_types
@@ -297,11 +292,11 @@ def _make_base(skl_sampler_func):
     """Maps a make_* function from sklearn.datasets to an extension.
 
     The extended version of the function implements transformations through the
-    various `XyTransformer.to_*` methods, enabled in the new function via the
+    various `NpXyTransformer.to_*` methods, enabled in the new function via the
     `astype` keyword and additional, optional keyword arguments.
 
     The goal is to use the make_* functions from sklearn to generate the data,
-    but then postprocess it with the various to_* methods from a XyTransformer
+    but then postprocess it with the various to_* methods from a NpXyTransformer
     class.
 
     Parameters
@@ -321,7 +316,7 @@ def _make_base(skl_sampler_func):
     - The docstring for the new function is automatically generated to provide all
       the information the user needs to use the infuction: what can be passed to
       `astype`, where to find the valid keywords for a given type: in
-      `XyTransformer.to_dataset` for `astype='dataset'`, etc.
+      `NpXyTransformer.to_dataset` for `astype='dataset'`, etc.
     - A decorator doesn't solve this. It could add the functionality, but it
       would not change the docstring or the signature of the function, as it
       would keep the original one from the wrapped function from sklearn. So we
@@ -361,7 +356,7 @@ def _make_base(skl_sampler_func):
     shuffle=True, random_state=None, *, astype='dataset', **kwargs)>
 
     If `astype=None`, then the `make_*` function behaves just like in sklearn, 
-    but returns a XyTransformer object that has various methods to postprocess that
+    but returns a NpXyTransformer object that has various methods to postprocess that
     (X, y) data. For example, we can generate a dataframe of simulated data for
     a regression exercise with
 
@@ -371,7 +366,7 @@ def _make_base(skl_sampler_func):
     or, equivalently,
 
     >>> transformer = make_regression(n_samples=5, n_features=2, random_state=0,
-    ...     astype=None)  #  this is a XyTransformer object
+    ...     astype=None)  #  this is a NpXyTransformer object
     >>> df2 = transformer.to_dataframe(xnames=['thing1', 'thing2'])
 
     Verifying:
@@ -404,7 +399,7 @@ def _make_base(skl_sampler_func):
         type_kwargs = {k: val for (k, val) in kwargs.items() if (k not in
             skl_kwds and k != 'astype')} 
 
-        # Step 2: obtain the XyTransformer object
+        # Step 2: obtain the NpXyTransformer object
         # First we need to check that we can handle the output of skl_sampler_func
         out = skl_sampler_func(*args, **skl_kwargs)
         if len(out) != 2:
@@ -416,7 +411,7 @@ def _make_base(skl_sampler_func):
                 raise ValueError("Y must have dimension 1.")
             if X.shape[0] != y.shape[0]:
                 raise ValueError('X and y must have the same number of rows')
-        Xyt = XyTransformer(X, y)
+        Xyt = NpXyTransformer(X, y)
 
         # Step 3: convert the data to the desired type
         if astype is None:
@@ -436,12 +431,12 @@ def _make_base(skl_sampler_func):
     keyword-only arguments:
 
     astype: str
-        One of {accepted_types} or None to return an XyTransformer. See documentation
-        of XyTransformer.astype.
+        One of {accepted_types} or None to return an NpXyTransformer. See documentation
+        of NpXyTransformer.astype.
         
     **kwargs: dict
         Optional arguments that depend on astype. See documentation of
-        XyTransformer.astype. 
+        NpXyTransformer.astype. 
 
     See Also
     --------
@@ -450,8 +445,8 @@ def _make_base(skl_sampler_func):
 
     """.format(
             skl_funcname=(skl_sampler_func.__module__ + '.' + skl_sampler_func.__name__),
-            xy_transformer=(XyTransformer.__module__ + '.' + XyTransformer.__name__),
-            accepted_types=(str(XyTransformer.accepted_types))
+            xy_transformer=(NpXyTransformer.__module__ + '.' + NpXyTransformer.__name__),
+            accepted_types=(str(NpXyTransformer.accepted_types))
 
     )
     wrapper.__doc__ = preamble_doc # + skl_sampler_func.__doc__
@@ -527,5 +522,5 @@ for func_name in sklearn_make_funcs:
 globals().update(converted_make_funcs)  # careful with overwrite here
 
 
-extras = ['XyTransformer', 'fetch_lfw_people']
+extras = ['NpXyTransformer', 'fetch_lfw_people']
 __all__ = list(converted_make_funcs) + extras

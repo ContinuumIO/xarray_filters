@@ -6,7 +6,6 @@ from functools import wraps
 
 import xarray as xr
 
-from xarray_filters.astype import TypeTransformerBase, astype
 from xarray_filters.chain import chain
 from xarray_filters.reshape import (to_features,
                                     from_features,
@@ -17,7 +16,7 @@ from xarray_filters.constants import FEATURES_LAYER
 __all__ = ['MLDataset',]
 
 
-class MLDataset(xr.Dataset, TypeTransformerBase):
+class MLDataset(xr.Dataset):
     '''Wraps xarray.Dataset for chainable preprocessors and
     reshaping to feature matricies that may be inputs to
     scikit-learn or similar models
