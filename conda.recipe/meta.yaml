@@ -1,0 +1,41 @@
+package:
+  name: xarray_filters
+  version: {{ environ.get('GIT_DESCRIBE_TAG', 'notag') }}
+
+source:
+  path: ..
+
+build:
+  number: {{ environ.get('GIT_DESCRIBE_NUMBER', 0)|int }}
+
+requirements:
+  build:
+    - python
+    - setuptools
+
+  run:
+    - python
+    - xarray
+    - scikit-learn
+    - six
+
+about:
+  home: http://github.com/ContinuumIO/xarray_filters
+  license: MIT
+
+extra:
+  maintainers:
+    - Peter Steinberg              - Anaconda, Inc. - psteinberg [at] anaconda [dot] com
+    - Guilherme Pereira de Freitas - Anaconda, Inc. - gfreitas [at] anaconda [dot] com
+    - Greg Brener                  - Anaconda, Inc. - gbrener [at] anaconda [dot] com
+
+test:
+  imports:
+    - xarray_filters
+
+  requires:
+    - pytest
+
+  commands:
+    - py.test --doctest-modules -v $SP_DIR/xarray_filters  [unix]
+    - py.test --doctest-modules -v %SP_DIR%/xarray_filters  [win]
