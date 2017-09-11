@@ -1,0 +1,9 @@
+name: xarray_filters-env
+channels:
+ - conda-forge # essential for rasterio on osx
+dependencies:
+ - numpy
+ - pandas
+ - pytest
+ - scikit-learn
+ - xarray
