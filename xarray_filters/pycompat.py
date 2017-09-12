@@ -16,7 +16,7 @@ Guidelines:
 Note: inspired on xarray/core/pycompat.py, xarray version 0.9.6.
 """
 
-from __future__ import division, print_function, absolute_import, unicode_literals
+from __future__ import division, print_function, unicode_literals
 import sys
 
 PYVERSION = (sys.version_info.major, sys.version_info.minor) 

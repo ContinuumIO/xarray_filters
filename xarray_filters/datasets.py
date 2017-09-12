@@ -45,8 +45,8 @@ Implementation Notes
 --------------------
 
 We create new data simulation functions based on the original sklearn ones.
-Each one of the new functions has the same signature as in sklearn, as well as
-some additional, optional keyword-only arguments:
+Each one of the new functions accepts the same arguments as in sklearn, as well
+as some additional, optional keyword-only arguments:
 
 - `astype` to cast the data to different types (defaults to `xarray.Dataset`)
 - `**kwargs` with optional keyword arguments that depend on what is passed to
@@ -58,8 +58,9 @@ For example, to obtain the exact same behavior as in sklearn, you can pass
 To support all the conversions, we create a class `NpXyTransformer` that has one
 method (`to_array`, `to_dataset`, `to_dataframe`, etc.) per conversion. In
 addition, we implement a `_make_base` function that maps a
-`sklearn.datasets.make_*` function to the new, extended version, with
-appropriate docstring and signature.
+`sklearn.datasets.make_*` function to the new, extended version with a useful
+docstring. On Python 3 that new function also has an appropriate/helpful
+signature.
 
 In a nutshell, the higher level API is like
 
@@ -72,8 +73,8 @@ At a lower level, that is equivalent to
 >>> transformer = make_blobs(astype=None)  # this is a NpXyTransformer object
 >>> m = transformer.to_dataset(xnames=['feat_1', 'feat_2'])
 
-The full list of converted functions from sklearn is in converted_make_funcs:
->>> sorted(converted_make_funcs.keys())  # doctest: +NORMALIZE_WHITESPACE
+The full list of converted functions from sklearn is in _converted_make_funcs:
+>>> sorted(_converted_make_funcs.keys())  # doctest: +NORMALIZE_WHITESPACE
 ['make_blobs',
  'make_circles',
  'make_classification',
@@ -115,6 +116,7 @@ from functools import partial, wraps
 
 from . utils import _infer_coords_and_dims
 from . mldataset import MLDataset
+from . pycompat import PY2, PY3
 
 
 
@@ -284,7 +286,7 @@ class NpXyTransformer:
         """
         assert to_type in self.__class__.accepted_types
         to_method_name = 'to_' + to_type
-        to_method = self.__getattribute__(to_method_name)
+        to_method = getattr(self, to_method_name)
         return to_method(**kwargs)
 
 
@@ -309,14 +311,14 @@ def _make_base(skl_sampler_func):
 
     Notes
     -----
-    - The signature of the new function is the same signature as the original
-      sklearn function with the addition of some keyword-only arguments. This
-      facilitates introspection and is useful when calling help() on the new
-      function.
     - The docstring for the new function is automatically generated to provide all
       the information the user needs to use the infuction: what can be passed to
       `astype`, where to find the valid keywords for a given type: in
       `NpXyTransformer.to_dataset` for `astype='dataset'`, etc.
+    - On Python 3, the signature of the new function is the same signature as
+      the original sklearn function with the addition of some keyword-only
+      arguments. This facilitates introspection and is useful when calling
+      help() on the new function.
     - A decorator doesn't solve this. It could add the functionality, but it
       would not change the docstring or the signature of the function, as it
       would keep the original one from the wrapped function from sklearn. So we
@@ -340,25 +342,11 @@ def _make_base(skl_sampler_func):
     >>> np.all(np.equal(yskl, our_data['y']))  # comparing ints
     True
 
-    The signature of each wrapper is identical to its sklearn equivalent, with
-    the addition of the `astype` keyword and additional, optional keywords to
-    go with `astype`
-
-    >>> inspect.signature(sklearn.datasets.make_classification)  # doctest: +NORMALIZE_WHITESPACE
-    <Signature (n_samples=100, n_features=20, n_informative=2, n_redundant=2,
-    n_repeated=0, n_classes=2, n_clusters_per_class=2, weights=None,
-    flip_y=0.01, class_sep=1.0, hypercube=True, shift=0.0, scale=1.0,
-    shuffle=True, random_state=None)>
-    >>> inspect.signature(make_classification)  # doctest: +NORMALIZE_WHITESPACE
-    <Signature (n_samples=100, n_features=20, n_informative=2, n_redundant=2,
-    n_repeated=0, n_classes=2, n_clusters_per_class=2, weights=None,
-    flip_y=0.01, class_sep=1.0, hypercube=True, shift=0.0, scale=1.0,
-    shuffle=True, random_state=None, *, astype='dataset', **kwargs)>
-
-    If `astype=None`, then the `make_*` function behaves just like in sklearn, 
-    but returns a NpXyTransformer object that has various methods to postprocess that
-    (X, y) data. For example, we can generate a dataframe of simulated data for
-    a regression exercise with
+    If one calls the returned `make_*` function with `astype=None`, then the
+    `make_*` function behaves just like in sklearn, but returns a
+    NpXyTransformer object that has various methods to postprocess that (X, y)
+    data. For example, we can generate a dataframe of simulated data for a
+    regression exercise with
 
     >>> df1 = make_regression(n_samples=5, n_features=2, random_state=0,
     ...     astype='dataframe', xnames=['thing1', 'thing2'])
@@ -374,25 +362,31 @@ def _make_base(skl_sampler_func):
     >>> np.allclose(df1, df2)  # comparing floats
     True
     """
-    skl_argspec = inspect.getfullargspec(skl_sampler_func)
     # Here is where we use the assumption that the make_* function from sklearn
     # has all positional or keyword arguments, all of them with defaults; it
     # could be easily adapted to more flexible setups. TODO: make this more
     # robust; users of the library may apply this to functions that do not
     # satisfy the assumptions listed above.
-    assert not skl_argspec.varargs, "{} has variable positional arguments".format(skl_sampler_func.__name__)
-    assert not skl_argspec.kwonlyargs, "{} has keyword-only arguments".format(skl_sampler_func.__name__)
-    assert len(skl_argspec.args) == len(skl_argspec.defaults), \
-            "Some args of {} have no default value".format(skl_sampler_func.__name__)
-    skl_params = [inspect.Parameter(name=pname, kind=inspect.Parameter.POSITIONAL_OR_KEYWORD, default=pdefault)
-                  for (pname, pdefault) in zip(skl_argspec.args, skl_argspec.defaults)]
+    if PY3:
+        skl_argspec = inspect.getfullargspec(skl_sampler_func)
+        assert not skl_argspec.varargs, "{} has variable positional arguments".format(skl_sampler_func.__name__)
+        assert not skl_argspec.kwonlyargs, "{} has keyword-only arguments".format(skl_sampler_func.__name__)
+        assert len(skl_argspec.args) == len(skl_argspec.defaults), \
+                "Some args of {} have no default value".format(skl_sampler_func.__name__)
+        skl_params = [inspect.Parameter(name=pname, kind=inspect.Parameter.POSITIONAL_OR_KEYWORD, default=pdefault)
+                      for (pname, pdefault) in zip(skl_argspec.args, skl_argspec.defaults)]
+    if PY2:
+        skl_argspec = inspect.getargspec(skl_sampler_func)
+        assert not skl_argspec.varargs, "{} has variable positional arguments".format(skl_sampler_func.__name__)
+        assert len(skl_argspec.args) == len(skl_argspec.defaults), \
+                "Some args of {} have no default value".format(skl_sampler_func.__name__)
     default_astype = 'dataset'
     def wrapper(*args, **kwargs):
         '''
         All optional/custom args are keyword arguments.
         '''
         # Step 1: process positional and keyword arguments
-        skl_kwds = skl_argspec.args + skl_argspec.kwonlyargs
+        skl_kwds = skl_argspec.args  # sufficient because skl make_* functions do not have kwonlyargs
         # splitting arguments into disjoint sets; astype is a special argument
         skl_kwargs = {k: val for (k, val) in kwargs.items() if k in skl_kwds}
         astype = kwargs.get('astype', default_astype)
@@ -450,12 +444,15 @@ def _make_base(skl_sampler_func):
 
     )
     wrapper.__doc__ = preamble_doc # + skl_sampler_func.__doc__
-    # Task 2 of 2: fixing the signature of `wrapper`
-    astype_param = inspect.Parameter(name='astype', kind=inspect.Parameter.KEYWORD_ONLY, default=default_astype)
-    kwargs_param = inspect.Parameter(name='kwargs', kind=inspect.Parameter.VAR_KEYWORD)
-    params = skl_params + [astype_param, kwargs_param]
-    wrapper.__signature__ = inspect.Signature(params)
     wrapper.__name__ = skl_sampler_func.__name__
+    if PY3:
+        # Task 2 of 2: fixing the signature of `wrapper`, difficult to do in Python 2
+        # because the needed features in the inspect module are available only
+        # in Python 3
+        astype_param = inspect.Parameter(name='astype', kind=inspect.Parameter.KEYWORD_ONLY, default=default_astype)
+        kwargs_param = inspect.Parameter(name='kwargs', kind=inspect.Parameter.VAR_KEYWORD)
+        params = skl_params + [astype_param, kwargs_param]
+        wrapper.__signature__ = inspect.Signature(params)
     return wrapper
 
 
@@ -510,17 +507,17 @@ Attributes:
 
 
 # Convert all sklearn functions that admit conversion
-converted_make_funcs = dict()  # holds converted sklearn funcs
-sklearn_make_funcs = [_ for _ in dir(sklearn.datasets) if _.startswith('make_')]  # conversion candidates
-for func_name in sklearn_make_funcs:
+_converted_make_funcs = dict()  # holds converted sklearn funcs
+_sklearn_make_funcs = [_ for _ in dir(sklearn.datasets) if _.startswith('make_')]  # conversion candidates
+for func_name in _sklearn_make_funcs:
     try:
         func = getattr(sklearn.datasets, func_name)
-        converted_make_funcs[func_name] = _make_base(func)
+        _converted_make_funcs[func_name] = _make_base(func)
     except (ValueError, AssertionError) as e:
         warning_msg = "Cannot convert function {}. ".format(func_name) + str(e)
         logger.info(warning_msg)
-globals().update(converted_make_funcs)  # careful with overwrite here
+globals().update(_converted_make_funcs)  # careful with overwrite here
 
 
 extras = ['NpXyTransformer', 'fetch_lfw_people']
-__all__ = list(converted_make_funcs) + extras
+__all__ = list(_converted_make_funcs) + extras
