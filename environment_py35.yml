@@ -1,4 +1,4 @@
-name: xarray_filters_py3
+name: xarray_filters_py35
 channels:
  - conda-forge # essential for rasterio on osx
 dependencies:
