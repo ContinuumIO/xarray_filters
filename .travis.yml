@@ -39,7 +39,7 @@ notifications:
 deploy:
   - provider: script
     script:
-      - conda install --name root anaconda-client && conda build $CHANNELS --output --python $PYTHON --numpy $NUMPY conda.recipe | sed 's/-py[^_]*/-py\*/' | xargs ls -1 | xargs conda convert -p all -o _pkgs && find _pkgs -type f -name "*.tar.bz2" -exec anaconda -t $ANACONDA_UPLOAD_TOKEN upload --user $ANACONDA_UPLOAD_USER --label dev {} \+
+      - bash anaconda_upload.sh
     on:
       tags: false
       all_branches: true
