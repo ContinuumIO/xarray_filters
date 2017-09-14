@@ -114,9 +114,9 @@ import logging
 from collections import Sequence, OrderedDict, defaultdict
 from functools import partial, wraps
 
-from . utils import _infer_coords_and_dims
-from . mldataset import MLDataset
-from . pycompat import PY2, PY3
+from xarray_filters.utils import _infer_coords_and_dims
+from xarray_filters.mldataset import MLDataset
+from xarray_filters.pycompat import PY2, PY3
 
 
 
@@ -195,8 +195,8 @@ class NpXyTransformer:
         >>> df = transformer.to_dataframe(xnames=['temp', 'pressure'], yname='humidity')
         >>> type(df)
         <class 'pandas.core.frame.DataFrame'>
-        >>> df.columns
-        Index(['temp', 'pressure', 'humidity'], dtype='object')
+        >>> df.columns.tolist() == ['temp', 'pressure', 'humidity']
+        True
         """
         nfeatures = self.X.shape[1]
         if not xnames:
