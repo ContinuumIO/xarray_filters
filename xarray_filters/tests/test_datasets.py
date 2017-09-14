@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 '''
 
 Programmatically test that each of the following
