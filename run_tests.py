@@ -6,7 +6,7 @@ import time
 import logging
 import datetime
 
-
+assert sys.version_info >= (3,)
 
 # Run one test per conda env file
 
@@ -77,7 +77,7 @@ if __name__ == "__main__":
         if not exists_env(env_data['name']):
             create_env(enf_fpath)
         test_report = make_test_report(env_data['name'])
-        test_log_fname = '_'.join([env_data['name'], str(test_report['t0_UTC']), 'test.log'])
+        test_log_fname = '_'.join([env_data['name'], str(test_report['t0_UTC']), 'test.json'])
         report_path = os.path.join(test_logs_dir, test_log_fname)
         with open(report_path, mode='w') as f:
             json.dump(test_report, f, indent=4)
