@@ -11,7 +11,7 @@ test -z "$NUMPY" && echo "Please set the NUMPY environment variable" && exit 1
 set -x
 
 conda install --name root anaconda-client
-pkg_fpath=`conda build $CHANNELS --output --python $PYTHON --numpy $NUMPY conda.recipe | sed 's/-py[^_]*/-py\*/' | xargs \ls -1`
+pkg_fpath=`conda build $CHANNELS --output --python $PYTHON --numpy $NUMPY conda.recipe`
 conda convert -p all -o _pkgs "$pkg_fpath"
 find _pkgs -type f -name "*.tar.bz2" -exec \
      anaconda --token "$ANACONDA_UPLOAD_TOKEN" upload --user "$ANACONDA_UPLOAD_USER" --label dev {} \+
