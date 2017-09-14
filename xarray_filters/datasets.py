@@ -99,7 +99,8 @@ the keyword `astype`) is
 
 """
 
-
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
 
 import inspect
 import string
@@ -109,6 +110,7 @@ import xarray as xr
 import pandas as pd
 import sklearn.datasets
 import logging
+import six
 
 from collections import Sequence, OrderedDict, defaultdict
 from functools import partial, wraps
@@ -374,14 +376,18 @@ def _make_base(skl_sampler_func):
     >>> np.allclose(df1, df2)  # comparing floats
     True
     """
-    skl_argspec = inspect.getfullargspec(skl_sampler_func)
+    if six.PY2:
+        skl_argspec = inspect.getargspec(skl_sampler_func)
+    else:
+        skl_argspec = inspect.getfullargspec(skl_sampler_func)
     # Here is where we use the assumption that the make_* function from sklearn
     # has all positional or keyword arguments, all of them with defaults; it
     # could be easily adapted to more flexible setups. TODO: make this more
     # robust; users of the library may apply this to functions that do not
     # satisfy the assumptions listed above.
     assert not skl_argspec.varargs, "{} has variable positional arguments".format(skl_sampler_func.__name__)
-    assert not skl_argspec.kwonlyargs, "{} has keyword-only arguments".format(skl_sampler_func.__name__)
+    if not six.PY2:
+        assert not skl_argspec.kwonlyargs, "{} has keyword-only arguments".format(skl_sampler_func.__name__)
     assert len(skl_argspec.args) == len(skl_argspec.defaults), \
             "Some args of {} have no default value".format(skl_sampler_func.__name__)
     skl_params = [inspect.Parameter(name=pname, kind=inspect.Parameter.POSITIONAL_OR_KEYWORD, default=pdefault)
@@ -392,7 +398,7 @@ def _make_base(skl_sampler_func):
         All optional/custom args are keyword arguments.
         '''
         # Step 1: process positional and keyword arguments
-        skl_kwds = skl_argspec.args + skl_argspec.kwonlyargs
+        skl_kwds = skl_argspec.args + (skl_argspec.kwonlyargs if not six.PY2 else skl_argspec.keywords)
         # splitting arguments into disjoint sets; astype is a special argument
         skl_kwargs = {k: val for (k, val) in kwargs.items() if k in skl_kwds}
         astype = kwargs.get('astype', default_astype)
