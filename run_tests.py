@@ -3,12 +3,15 @@ import glob
 import subprocess
 import sys
 import time
-import logging
 import datetime
+import shlex
 
 assert sys.version_info >= (3,)
 
 # Run one test per conda env file
+
+def utc_timestamp():
+    return datetime.datetime.timestamp(datetime.datetime.utcnow())
 
 def exists_env(env_name):
     """Check if the environment name from env_fpath exists."""
@@ -34,23 +37,20 @@ def run_tests(env_name):
     return out.decode(encoding='utf-8')
 
 def make_test_report(env_name):
+    cmd_output = lambda cmd: subprocess.check_output(shlex.split(cmd)).decode('utf-8').rstrip()
     test_report = {
-        'git_commit': subprocess.check_output('git rev-parse HEAD',
-            shell=True).decode('utf-8').rstrip(),
-        'git_diff': subprocess.check_output('git diff',
-            shell=True).decode('utf-8').rstrip(),
-        'git_remotes': subprocess.check_output('git remote -v',
-            shell=True).decode('utf-8').rstrip(),
-        'git_user.name': subprocess.check_output('git config user.name',
-            shell=True).decode('utf-8').rstrip(),
-        'git_user.email': subprocess.check_output('git config user.email',
-            shell=True).decode('utf-8').rstrip()
+        'git_commit': cmd_output('git rev-parse HEAD'),
+        'git_diff': cmd_output('git diff'),
+        'git_remotes': cmd_output('git remote -v'),
+        'git_user.name': cmd_output('git config user.name'),
+        'git_user.email': cmd_output('git config user.email'),
+        'conda_env_spec.yaml': cmd_output('conda env export -n ' + env_name)
     }
-    test_report['t0_UTC'] = datetime.datetime.fromtimestamp(time.time()).strftime('%Y%m%d_%H%M%S')
-    test_report['report'] = run_tests(env_name)
-    test_report['t1_UTC'] = datetime.datetime.fromtimestamp(time.time()).strftime('%Y%m%d_%H%M%S')
-    test_report['status'] = [l.rstrip()
-            for l in test_report['report'].splitlines()
+    test_report['t0_UTC'] = utc_timestamp()
+    test_report['test_report'] = run_tests(env_name)
+    test_report['t1_UTC'] = utc_timestamp()
+    test_report['test_status'] = [l.rstrip()
+            for l in test_report['test_report'].splitlines()
             if (l.startswith('=============') and 'seconds' in l)][-1]
     return test_report
 
@@ -58,9 +58,7 @@ if __name__ == "__main__":
     import os
     import json
 
-    logging.basicConfig()
     test_logs_dir = 'test_logs'
-
     try:
         os.mkdir(test_logs_dir)
     except FileExistsError:
@@ -68,23 +66,23 @@ if __name__ == "__main__":
 
     env_files = glob.glob('environment*.yml') + glob.glob('environment*.yaml')
     ntests = len(env_files)
-
     for (testn, env_fpath) in enumerate(env_files):
         with open(env_fpath) as f:
             env_data = yaml.load(f)
-        print("Running test {:d} out of {:d}. Environment: {}".format(
+        print("Running tests for environment {:d} out of {:d}: {}".format(
             testn + 1, ntests, env_data['name']))
         if not exists_env(env_data['name']):
             create_env(enf_fpath)
         test_report = make_test_report(env_data['name'])
-        test_log_fname = '_'.join([env_data['name'], str(test_report['t0_UTC']), 'test.json'])
+        timestamp_suffix = datetime.datetime.fromtimestamp(test_report['t0_UTC']).strftime('%Y%m%d_%H%M%S')
+        test_log_fname = env_data['name'] + '_test-' + timestamp_suffix + '.json'
         report_path = os.path.join(test_logs_dir, test_log_fname)
-        with open(report_path, mode='w') as f:
+        with open(report_path, mode='a') as f:
             json.dump(test_report, f, indent=4)
-        t0, t1, retcode = [test_report.get(x) for x in ('t0_UTC', 't1_UTC', 'retcode')]
         print('Test log in {}'.format(report_path))
-        print(test_report['status'] + '\n')
+        print(test_report['test_status'] + '\n')
+
     print("All tests finished. Run\n")
-    print("    echo -e $(jq '.report' <logfile_path>)")
+    print("    echo -e $(jq '.test_report' <logfile_path>)")
     print("\nto see the test report. Additional metadata stored in the log file json.")
 
