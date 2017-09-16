@@ -1,0 +1,12 @@
+name: xarray_filters_py36
+channels:
+ - conda-forge # essential for rasterio on osx
+dependencies:
+ - python=3.6
+ - numpy
+ - pandas
+ - pytest
+ - pytest-cov
+ - scikit-learn
+ - xarray
+ - six

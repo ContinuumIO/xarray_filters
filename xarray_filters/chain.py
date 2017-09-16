@@ -5,6 +5,8 @@ from collections import OrderedDict
 
 from xarray_filters.pipe_utils import for_each_array
 
+from xarray_filters.pycompat import *
+
 __all__ = ['chain',]
 
 def format_chain_args(trans):
@@ -38,7 +40,7 @@ def format_chain_args(trans):
                     kw = dict()
                     kw_idx = None
                 func = [idx for idx, _ in enumerate(tran)
-                        if isinstance(_, str) or callable(_)]
+                        if isinstance(_, basestring) or callable(_)]
                 if not func:
                     raise ValueError('Expected a string DataArray method name or a callable in {}'.format(tran))
                 args = [_ for idx, _ in enumerate(tran)

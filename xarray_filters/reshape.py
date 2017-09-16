@@ -54,7 +54,7 @@ def has_features(dset, raise_err=True, features_layer=None):
     >>> dset2 = to_features(dset1)
     >>> assert ('features',) == tuple(dset2.data_vars)
     >>> assert np.all(dset2.features == arr1)
-    >>> dset2
+    >>> dset2  # doctest: +SKIP
     <xarray.MLDataset>
     Dimensions:   (layer: 1, space: 4)
     Coordinates:
@@ -64,8 +64,8 @@ def has_features(dset, raise_err=True, features_layer=None):
       * layer     (layer) object 'pressure'
     Data variables:
         ...
-    >>> has_features(dset2)
-    'features'
+    >>> has_features(dset2) == 'features'
+    True
     >>> has_features(dset1, raise_err=False)
     >>> has_features(dset1, raise_err=True)
     Traceback (most recent call last):
@@ -139,7 +139,7 @@ def to_features(dset, layers=None, row_dim=None,
     >>> assert isinstance(dset, MLDataset) and tuple(dset.data_vars) == ('pressure',)
     >>> arr2 = to_features(dset)
     >>> assert np.all(arr1 == arr2.features)
-    >>> arr2
+    >>> arr2  # doctest: +SKIP
     <xarray.MLDataset>
     Dimensions:   (layer: 1, space: 4)
     Coordinates:
@@ -227,7 +227,7 @@ def from_features(arr, axis=0):
     >>> dset2 = to_features(dset1)
     >>> assert ('features',) == tuple(dset2.data_vars)
     >>> assert np.all(dset2.features == arr1)
-    >>> dset2
+    >>> dset2  # doctest: +SKIP
     <xarray.MLDataset>
     Dimensions:   (layer: 1, space: 4)
     Coordinates:
