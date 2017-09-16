@@ -12,8 +12,8 @@ from xarray_filters.tests.test_data import *
 def test_aggregations_can_chain():
     X = new_test_dataset(TEST_LAYERS)
     # The following should be the same: new_X and new_Xb
-    args_kwargs = [['mean', dict(dim='z')], # From 4D to 3D
-                   ['std', dict(dim='t')]] # From 3D to 2D
+    args_kwargs = [[MLDataset.mean, dict(dim='z')], # From 4D to 3D
+                   [MLDataset.std, dict(dim='t')]] # From 3D to 2D
     layers = ['temperature', 'pressure']
     new_X = X.chain(args_kwargs, layers=layers
                    ).to_features(features_layer='temp_pres')
@@ -43,7 +43,7 @@ def test_transforms_no_name():
     '''with no "name" keyword, all layers are passed through
     but transforms changes the dimensionality'''
     X = new_test_dataset(TEST_LAYERS)
-    step_1 = ['quantile', 0.5, dict(dim=('t', 'z'))]
+    step_1 = [MLDataset.quantile, 0.5, dict(dim=('t', 'z'))]
     example = X.chain([step_1, iqr_standard])
     assert isinstance(example, MLDataset)
     assert list(example.data_vars) == TEST_LAYERS
@@ -56,7 +56,7 @@ def test_named_aggregation_to_features():
     X = new_test_dataset(TEST_LAYERS)
     name = 'new_data_array'
     step_1 = iqr_standard
-    step_2 = ['quantile', 0.5, dict(dim=('t', 'z'))]
+    step_2 = [MLDataset.quantile, 0.5, dict(dim=('t', 'z'))]
     example = X.chain((step_1, step_2)).to_features(features_layer=name)
     assert isinstance(example, MLDataset)
     assert name not in X.data_vars
