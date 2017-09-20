@@ -4,6 +4,7 @@ from __future__ import (absolute_import, division,
 from collections import OrderedDict
 from functools import wraps
 
+import pandas as pd
 import xarray as xr
 
 from xarray_filters.chain import chain
@@ -64,9 +65,10 @@ class MLDataset(xr.Dataset):
             yname = YNAME
         return yname
 
-    def _extract_y_from_features(self, dset=None,
+    def _extract_y_from_features(self, dset=None, y=None, features_layer=None,
                                  yname=None, y1d=True, as_np=True):
-        features_layer = has_features(features_layer=features_layer)
+        features_layer = features_layer or FEATURES_LAYER
+        features_layer = has_features(dset, features_layer=features_layer)
         if dset is None:
             dset = self
         if features_layer:
@@ -78,22 +80,26 @@ class MLDataset(xr.Dataset):
             xkw = {col_dim: idxes}
             ykw = {col_dim: yname}
             X = arr.isel(**xkw)
-            y = arr.isel(**ykw)
-            if to_np:
-                X, y = X.values, y.values
-                if y1d:
-                    y.resize((y.size, 1))
+            if y is None:
+                if yname in getattr(arr, arr.dims[-1], pd.Series([]).values):
+                    y = arr.isel(**ykw)
+                    if as_np:
+                        y = y.values
+            if as_np and y1d and y is not None and y.ndim == 2 and y.shape[1] == 1:
+                y = y.squeeze()
+            if as_np:
+                X = X.values
                 return X, y
             else:
                 return X.to_dataframe(), y.to_dataframe()
         else:
             raise ValueError('TODO --- msg?')
 
-    def to_array(self, features_layer=None, **kw):
+    def to_array(self, y=None, features_layer=None, **kw):
         "Return X, y NumPy arrays with given shape"
         features_layer = self.has_features(raise_err=False)
         dset = self.to_features(features_layer=features_layer, **kw)
-        return self._extract_y_from_features(dset=dset, to_np=True)
+        return self._extract_y_from_features(dset=dset, y=y, features_layer=features_layer, as_np=True)
 
 
     def to_dataframe(self, layers=None, yname=None):
