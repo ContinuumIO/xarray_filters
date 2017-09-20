@@ -7,6 +7,7 @@ from pprint import pformat
 import numpy as np
 import xarray as xr
 
+from xarray_filters.datasets import make_blobs
 from xarray_filters import *
 
 @for_each_array
@@ -18,6 +19,15 @@ def iqr_standard(arr, **kw):
     upper = arr.quantile(0.75)
     lower = arr.quantile(0.25)
     return (arr - median) / (upper - lower)
+
+
+def ts_clustering_example(n_features=20, shape=(200, 10, 10)):
+    return MLDataset(make_blobs(n_samples=np.prod(shape),
+                                shape=shape,
+                                n_features=n_features,
+                                layers=('layer_{}'.format(idx)
+                                        for idx in range(n_features))))
+
 
 ## The following are "spec" arguments to build_run_spec for testing
 
@@ -67,5 +77,7 @@ new_test_dataset = lambda layers: MLDataset(OrderedDict([(layer, a()) for layer 
 
 
 extras = ['new_test_dataset', 'TEST_LAYERS', 'iqr_standard']
+
+
 __all__ = [name for name in tuple(globals().keys())
            if name.startswith('Spec')] + extras
