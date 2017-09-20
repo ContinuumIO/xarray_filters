@@ -148,7 +148,7 @@ def ts_describe(dset, axis=0, dim=None, layer=None,
         names = default_names
     if len(set(default_names) & set(names)) != len(names):
         raise ValueError('Found names not in {}'.format(default_names))
-    idxes = [default_names.index(name) for name in default_names]
+    idxes = [default_names.index(name) for name in names]
     def each_arr(arr, layer, names, idxes):
         return resize_each_1d_slice(arr, partial(_describe, idxes),
                                     axis=axis, dim=dim, keep_attrs=keep_attrs,

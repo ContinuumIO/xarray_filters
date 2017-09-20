@@ -60,7 +60,8 @@ def test_ts_describe():
 
 def test_ts_describe_subset():
     s = TSDescribe()
-    s.set_params(layer='layer_1', axis=0)
+    subset = ['kurt', 'np_skew', 'median']
+    s.set_params(layer='layer_1', axis=0, names=subset)
     orig = ts_clustering_example()
     dset = s.transform(orig)
-    layers = tuple(dset.layer)
+    layers = list(dset.layer) == subset
