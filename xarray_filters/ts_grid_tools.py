@@ -77,11 +77,9 @@ def resize_each_1d_slice(arr, func, axis=0, dim=None, keep_attrs=True, names=Non
     dims = tuple(d for d in arr.dims if d != dim)
     shape = tuple(s for idx, s in enumerate(arr.shape)
                   if idx != axis)
-    print('dds', arr.dims, dims, shape)
     if chunks is None:
         chunks = guess_chunks(shape)  # TODO fix if implementing da.empty below
     num_rows = np.prod(shape)
-    print('nr', num_rows)
     new_arr = None
     for row, (i, j) in enumerate(product(*(range(s) for s in shape))):
         arr_1d = _arr_nd_to_1d(func, axis, arr.values, i, j, **kw)
@@ -98,11 +96,6 @@ def resize_each_1d_slice(arr, func, axis=0, dim=None, keep_attrs=True, names=Non
         names = np.arange(arr_1d.size)
     coords = [(FEATURES_LAYER_DIMS[0], index),
               (FEATURES_LAYER_DIMS[1], np.array(names))]
-    print('names', names, len(names))
-    print('indx', [s.size for s in np_arrs])
-    print('new', new_arr.shape)
-    print('coords', coords, 'attrs', attrs, FEATURES_LAYER_DIMS)
-    print('lennn', len(index.tolist()))
     new_arr = xr.DataArray(new_arr,
                            coords=coords,
                            dims=FEATURES_LAYER_DIMS,
@@ -110,7 +103,6 @@ def resize_each_1d_slice(arr, func, axis=0, dim=None, keep_attrs=True, names=Non
                            name=FEATURES_LAYER)
     new_dset = MLDataset(OrderedDict([(FEATURES_LAYER, new_arr)]),
                          attrs=attrs)
-    print('new_dset', repr(new_dset))
     return new_dset
 
 
@@ -212,7 +204,6 @@ class TSProbs(Step):
         # TODO y is ignored (document)
         # TODO - Default True / False on keep_attrs?
         params = self.get_params()
-        print('params', params)
         return ts_probs(dset=X, **params)
 
 
@@ -227,7 +218,6 @@ class TSDescribe(Step):
         # TODO docstring from ts_describe
         # TODO y is ignored (document)
         params = self.get_params()
-        print('params', params)
         return ts_describe(dset=X, **params)
 
 __all__ = ['TSDescribe', 'TSProbs']
