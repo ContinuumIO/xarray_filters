@@ -65,13 +65,13 @@ signature.
 In a nutshell, the higher level API is like
 
 >>> m = make_blobs(n_samples=5, n_features=2,  # sklearn args
-...     astype='dataset', xnames=['feat_1', 'feat_2'])  # new args
+...     astype='dataset', layers=['feat_1', 'feat_2'])  # new args
 
 At a lower level, that is equivalent to
 
 >>> make_blobs = _make_base(sklearn.datasets.make_blobs)
 >>> transformer = make_blobs(astype=None)  # this is a NpXyTransformer object
->>> m = transformer.to_dataset(xnames=['feat_1', 'feat_2'])
+>>> m = transformer.to_dataset(layers=['feat_1', 'feat_2'])
 
 The full list of converted functions from sklearn is in _converted_make_funcs:
 >>> sorted(_converted_make_funcs.keys())  # doctest: +NORMALIZE_WHITESPACE
@@ -173,12 +173,12 @@ class NpXyTransformer:
             X, y = self.X, self.y
         return X, y
 
-    def to_dataframe(self, xnames=None, yname=None):
+    def to_dataframe(self, layers=None, yname=None):
         """Return a single dataframe with features, labels optionally named.
 
         Parameters
         ----------
-        xnames: sequence of str
+        layers: sequence of str
             Feature names.
         yname: str
             Name of the label variable (variable we are trying to predict).
@@ -192,22 +192,22 @@ class NpXyTransformer:
         --------
         >>> transformer = make_regression(n_samples=5, n_features=2, random_state=0,
         ...     astype=None)
-        >>> df = transformer.to_dataframe(xnames=['temp', 'pressure'], yname='humidity')
+        >>> df = transformer.to_dataframe(layers=['temp', 'pressure'], yname='humidity')
         >>> type(df)
         <class 'pandas.core.frame.DataFrame'>
         >>> df.columns.tolist() == ['temp', 'pressure', 'humidity']
         True
         """
         nfeatures = self.X.shape[1]
-        if not xnames:
-            xnames = ['X' + str(n) for n in range(nfeatures)]
+        if not layers:
+            layers = ['X' + str(n) for n in range(nfeatures)]
         if not yname:
             yname = 'y'
-        df = pd.DataFrame(self.X, columns=xnames)
+        df = pd.DataFrame(self.X, columns=layers)
         df[yname] = self.y
         return df
 
-    def to_dataset(self, coords=None, dims=None, attrs=None, shape=None, xnames=None, yname=None):
+    def to_dataset(self, coords=None, dims=None, attrs=None, shape=None, layers=None, yname=None):
         """Return an xarray.DataSet with given shape, coords/dims/var names.
 
         Parameters
@@ -228,7 +228,7 @@ class NpXyTransformer:
         shape: tuuple, optional
             Length of each dimension, or equivalently, number of elements in each
             coordinate.
-        xnames : sequence of str, optional
+        layers : sequence of str, optional
             Name given to each feature (column in self.X).
         yname : str, optional
             Name given to the label variable (self.y).
@@ -246,11 +246,11 @@ class NpXyTransformer:
             shape = (self.X.shape[0],)
         new_coords, new_dims = _infer_coords_and_dims(shape, coords, dims)
         nfeatures = self.X.shape[1]
-        if not xnames:
-            xnames = ['X' + str(n) for n in range(nfeatures)]
+        if not layers:
+            layers = ['X' + str(n) for n in range(nfeatures)]
         # store features X in dataset
         ds = xr.Dataset(attrs=attrs)
-        for (xname, col) in zip(xnames, self.X.T):
+        for (xname, col) in zip(layers, self.X.T):
             ds[xname] = xr.DataArray(data=col.reshape(shape), coords=new_coords, dims=new_dims)
         # store label y
         if not yname:
@@ -264,7 +264,7 @@ class NpXyTransformer:
                                dims=dims,
                                attrs=attrs,
                                shape=shape,
-                               xnames=layers,
+                               layers=layers,
                                yname=yname)
         return MLDataset(dset)
 
@@ -349,13 +349,13 @@ def _make_base(skl_sampler_func):
     regression exercise with
 
     >>> df1 = make_regression(n_samples=5, n_features=2, random_state=0,
-    ...     astype='dataframe', xnames=['thing1', 'thing2'])
+    ...     astype='dataframe', layers=['thing1', 'thing2'])
 
     or, equivalently,
 
     >>> transformer = make_regression(n_samples=5, n_features=2, random_state=0,
     ...     astype=None)  #  this is a NpXyTransformer object
-    >>> df2 = transformer.to_dataframe(xnames=['thing1', 'thing2'])
+    >>> df2 = transformer.to_dataframe(layers=['thing1', 'thing2'])
 
     Verifying:
 
@@ -391,7 +391,7 @@ def _make_base(skl_sampler_func):
         skl_kwargs = {k: val for (k, val) in kwargs.items() if k in skl_kwds}
         astype = kwargs.get('astype', default_astype)
         type_kwargs = {k: val for (k, val) in kwargs.items() if (k not in
-            skl_kwds and k != 'astype')} 
+            skl_kwds and k != 'astype')}
 
         # Step 2: obtain the NpXyTransformer object
         # First we need to check that we can handle the output of skl_sampler_func
@@ -427,10 +427,10 @@ def _make_base(skl_sampler_func):
     astype: str
         One of {accepted_types} or None to return an NpXyTransformer. See documentation
         of NpXyTransformer.astype.
-        
+
     **kwargs: dict
         Optional arguments that depend on astype. See documentation of
-        NpXyTransformer.astype. 
+        NpXyTransformer.astype.
 
     See Also
     --------

@@ -16,9 +16,10 @@ class PatchInitSig(type):
         setattr_section_strs = []
         params_to_keep = []
         for param, val in attr.items():
-            if not param.startswith('_') and param not in ('transform',):
-                setattr_section_strs.append('self.{0} = {0}'.format(param))
-                params_to_keep.append(param)
+            if param not in ('transform',):
+                if not param.startswith('_'):
+                    setattr_section_strs.append('self.{0} = {0}'.format(param))
+                    params_to_keep.append(param)
         if not params_to_keep:
             def init_method_noargs(self):
                 self.fit_transform = self.transform
@@ -45,7 +46,6 @@ class Step(six.with_metaclass(PatchInitSig,
     def transform(self, X, y=None, **params):
         """This method must be overridden by subclasses of Step."""
 
-
 class WriteNetCDF(Step):
     fname = ''
     def transform(self, dset):
@@ -59,7 +59,7 @@ class WriteNetCDF(Step):
         dset.to_netcdf(fname, **params)
         return dset
 
-    
+
 class Pipeline(sklearn.pipeline.Pipeline):
     def __init__(self, steps, memory=None):
         steps_copy = list(steps)
