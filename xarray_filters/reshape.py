@@ -74,11 +74,14 @@ def has_features(dset, raise_err=True, features_layer=None):
     '''
     if features_layer is None:
         features_layer = FEATURES_LAYER
-    arr = getattr(dset, features_layer, None)
-    if arr is None or not hasattr(arr, 'dims') or tuple(arr.dims) !=  FEATURES_LAYER_DIMS:
-        msg = 'Expected an MLDataset/Dataset with DataArray "{}" and dims {}'
+    if features_layer not in dset.data_vars:
         if raise_err:
-            raise ValueError(msg.format(features_layer, FEATURES_LAYER_DIMS))
+            raise ValueError('{} DataArray is not in dset (found {})'.format(features_layer, dset.data_vars.keys()))
+        return None
+    arr = dset[features_layer]
+    if arr.ndim != 2:
+        if raise_err:
+            raise ValueError('Expected {} DataArray with ndim = 2'.format(features_layer, FEATURES_LAYER_DIMS))
         else:
             return None
     return features_layer

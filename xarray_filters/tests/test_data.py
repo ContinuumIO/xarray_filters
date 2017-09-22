@@ -76,7 +76,7 @@ a = lambda: xr.DataArray(r(), coords=c(), dims=dims)
 new_test_dataset = lambda layers: MLDataset(OrderedDict([(layer, a()) for layer in layers]))
 
 
-extras = ['new_test_dataset', 'TEST_LAYERS', 'iqr_standard']
+extras = ['new_test_dataset', 'TEST_LAYERS', 'iqr_standard', 'ts_clustering_example']
 
 
 __all__ = [name for name in tuple(globals().keys())

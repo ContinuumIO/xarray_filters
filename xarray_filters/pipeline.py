@@ -46,6 +46,23 @@ class Step(six.with_metaclass(PatchInitSig,
     def transform(self, X, y=None, **params):
         """This method must be overridden by subclasses of Step."""
 
+
+
+class Generic(Step):
+    func = None
+    kw = None
+
+    def transform(self, X, y=None, **params):
+        p1 = self.get_params()
+        func = p1.pop('func', self.func)
+        kw = p1.pop('kw', {}) or {}
+        kw.update(params)
+        kw.update(p1)
+        if not func:
+            raise ValueError('TODO message')
+        return func(X, y=y, **kw)
+
+
 class WriteNetCDF(Step):
     fname = ''
     def transform(self, dset):
