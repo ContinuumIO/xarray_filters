@@ -79,11 +79,6 @@ def has_features(dset, raise_err=True, features_layer=None):
             raise ValueError('{} DataArray is not in dset (found {})'.format(features_layer, dset.data_vars.keys()))
         return None
     arr = dset[features_layer]
-    if arr.ndim != 2:
-        if raise_err:
-            raise ValueError('Expected {} DataArray with ndim = 2'.format(features_layer, FEATURES_LAYER_DIMS))
-        else:
-            return None
     return features_layer
 
 
@@ -242,8 +237,6 @@ def from_features(arr, axis=0):
       ...
     '''
     from xarray_filters.mldataset import MLDataset
-    if arr.ndim > 2:
-        raise ValueError('Expected 2D input arr but found {}'.format(arr.shape))
     coords, dims = multi_index_to_coords(arr, axis=axis)
     simple_axis = 0 if axis == 1 else 1
     simple_dim = arr.dims[simple_axis]
@@ -294,9 +287,8 @@ def concat_ml_features(*dsets, **kwargs):
     '''
     features_layer = kwargs.get('features_layer', FEATURES_LAYER)
     concat_dim = kwargs.get('concat_dim', None)
-    keep_attrs = kwargs.get('keep_attrs', False)
+    keep_attrs = kwargs.get('keep_attrs', False) # TODO True or False (convention?)
 
-    # TODO True or False (convention?)
     from xarray_filters.mldataset import MLDataset
     if not dsets:
         raise ValueError('No MLDataset / Dataset arguments passed.  Expected >= 1')

@@ -104,7 +104,6 @@ def filter_args_kwargs(func, *args, **kwargs):
             args_kw[name] = args[idx]
         if name in kw:
             args_kw[name] = kw[name]
-
     for k, v in kw.items():
         if k in kwarg_spec or takes_variable_keywords:
             args_kw[k] = v
