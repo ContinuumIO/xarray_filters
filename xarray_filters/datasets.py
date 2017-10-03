@@ -250,8 +250,8 @@ class NpXyTransformer:
             layers = ['X' + str(n) for n in range(nfeatures)]
         # store features X in dataset
         ds = xr.Dataset(attrs=attrs)
-        for (xname, col) in zip(layers, self.X.T):
-            ds[xname] = xr.DataArray(data=col.reshape(shape), coords=new_coords, dims=new_dims)
+        for (layer, col) in zip(layers, self.X.T):
+            ds[layer] = xr.DataArray(data=col.reshape(shape), coords=new_coords, dims=new_dims)
         # store label y
         if not yname:
             yname = 'y'
@@ -259,7 +259,37 @@ class NpXyTransformer:
         return ds
 
     def to_mldataset(self, coords=None, dims=None, attrs=None, shape=None, layers=None, yname=None):
-        '''TODO docs as above ^^'''
+        """Return an MLDataset with given shape, coords/dims/var names.
+
+        Parameters
+        ----------
+        coords : sequence or dict of array_like objects, optional
+            Coordinates (tick labels) to use for indexing along each dimension.
+            If dict-like, should be a mapping from dimension names to the
+            corresponding coordinates.
+        dims : str or sequence of str, optional
+            Name(s) of the the data dimension(s). Must be either a string (only
+            for 1D data) or a sequence of strings with length equal to the
+            number of dimensions. If this argument is omitted, dimension names
+            are taken from ``coords`` (if possible) and otherwise default to
+            ``['dim_0', ... 'dim_n']``.
+        attrs : dict_like or None, optional
+            Attributes to assign to the new instance. By default, an empty
+            attribute dictionary is initialized.
+        shape: tuuple, optional
+            Length of each dimension, or equivalently, number of elements in each
+            coordinate.
+        layers : sequence of str, optional
+            Name given to each feature (column in self.X).
+        yname : str, optional
+            Name given to the label variable (self.y).
+
+        Returns
+        -------
+        dataset = MLDataset
+            Each feature (column of self.X) and the label (self.y) becomes a
+            data variable in this dataset.
+        """
         dset = self.to_dataset(coords=coords,
                                dims=dims,
                                attrs=attrs,
@@ -380,7 +410,7 @@ def _make_base(skl_sampler_func):
         assert not skl_argspec.varargs, "{} has variable positional arguments".format(skl_sampler_func.__name__)
         assert len(skl_argspec.args) == len(skl_argspec.defaults), \
                 "Some args of {} have no default value".format(skl_sampler_func.__name__)
-    default_astype = 'dataset'
+    default_astype = 'mldataset'
     def wrapper(*args, **kwargs):
         '''
         All optional/custom args are keyword arguments.
@@ -389,10 +419,11 @@ def _make_base(skl_sampler_func):
         skl_kwds = skl_argspec.args  # sufficient because skl make_* functions do not have kwonlyargs
         # splitting arguments into disjoint sets; astype is a special argument
         skl_kwargs = {k: val for (k, val) in kwargs.items() if k in skl_kwds}
-        astype = kwargs.get('astype', default_astype)
+        astype = kwargs.get('astype', NpXyTransformer.default_type)
         type_kwargs = {k: val for (k, val) in kwargs.items() if (k not in
             skl_kwds and k != 'astype')}
-
+        if 'shape' in type_kwargs and 'n_samples' in skl_kwargs:
+            skl_kwargs['n_samples'] = np.prod(type_kwargs['shape'])
         # Step 2: obtain the NpXyTransformer object
         # First we need to check that we can handle the output of skl_sampler_func
         out = skl_sampler_func(*args, **skl_kwargs)
