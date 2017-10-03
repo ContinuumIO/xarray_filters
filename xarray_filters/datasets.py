@@ -422,7 +422,7 @@ def _make_base(skl_sampler_func):
         astype = kwargs.get('astype', NpXyTransformer.default_type)
         type_kwargs = {k: val for (k, val) in kwargs.items() if (k not in
             skl_kwds and k != 'astype')}
-        if 'shape' in type_kwargs and 'n_samples' in skl_kwargs:
+        if 'shape' in type_kwargs:
             skl_kwargs['n_samples'] = np.prod(type_kwargs['shape'])
         # Step 2: obtain the NpXyTransformer object
         # First we need to check that we can handle the output of skl_sampler_func
