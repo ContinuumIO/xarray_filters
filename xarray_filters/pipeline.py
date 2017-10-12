@@ -16,7 +16,7 @@ class PatchInitSig(type):
         setattr_section_strs = []
         params_to_keep = []
         for param, val in attr.items():
-            if param not in ('transform',):
+            if param not in ('transform','fit', 'fit_transform'):
                 if not param.startswith('_'):
                     setattr_section_strs.append('self.{0} = {0}'.format(param))
                     params_to_keep.append(param)
@@ -61,6 +61,12 @@ class Generic(Step):
         if not func:
             raise ValueError('TODO message')
         return func(X, y=y, **kw)
+
+    def fit(self, X, y=None, **params):
+        return self.transform(X, y=y, **params)
+
+    def fit_transform(self, X, y=None, **params):
+        return self.transform(X, y=y, **params)
 
 
 class WriteNetCDF(Step):
