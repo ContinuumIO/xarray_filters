@@ -16,7 +16,7 @@ class PatchInitSig(type):
         setattr_section_strs = []
         params_to_keep = []
         for param, val in attr.items():
-            if param not in ('transform','fit', 'fit_transform'):
+            if param not in ('transform','fit', 'fit_transform', 'score', 'predict'):
                 if not param.startswith('_'):
                     setattr_section_strs.append('self.{0} = {0}'.format(param))
                     params_to_keep.append(param)
@@ -45,7 +45,6 @@ class Step(six.with_metaclass(PatchInitSig,
     """
     def transform(self, X, y=None, **params):
         """This method must be overridden by subclasses of Step."""
-
 
 
 class Generic(Step):
