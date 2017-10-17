@@ -8,16 +8,16 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 '''
 from collections import Sequence
-import matplotlib.pyplot as plt
+
 import numpy as np
 
-def plot_3d(X, bands, title='', scale=None, axis_labels=True,
+def plot_3d(X, layers, title='', scale=None, axis_labels=True,
             **imshow_kwargs):
-    '''Plot a true or pseudo color image of 3 bands
+    '''Plot a true or pseudo color image of 3 layers
 
     Parameters:
         :X: MLDataset or xarray.Dataset
-        :bands: list of 3 band names that are in X
+        :layers: list of 3 layer names that are in X
         :title: title for figure
         :scale: divide all values by this (e.g. 2\*\* 16 for uint16)
         :axis_labels: True / False show axis_labels
@@ -27,12 +27,13 @@ def plot_3d(X, bands, title='', scale=None, axis_labels=True,
         :(arr, fig): where arr is the 3-D numpy array and fig is the figure
 
     '''
+    import matplotlib.pyplot as plt
     arr = None
     scale = 1 if scale is None else scale
-    for idx, band in enumerate(bands):
-        val = getattr(X, band).values
+    for idx, layer in enumerate(layers):
+        val = getattr(X, layer).values
         if idx == 0:
-            arr = np.empty((val.shape) + (len(bands),), dtype=np.float32)
+            arr = np.empty((val.shape) + (len(layers),), dtype=np.float32)
         if isinstance(scale, Sequence):
             s = scale[idx]
         else:
