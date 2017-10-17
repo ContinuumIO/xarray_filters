@@ -3,7 +3,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 '''
 ------------------------------------
 
-``earthio.filters.plotting_helpers``
+``xarray_filters.filters.plotting_helpers``
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 '''
