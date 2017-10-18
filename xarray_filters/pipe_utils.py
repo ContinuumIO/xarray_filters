@@ -42,8 +42,10 @@ def data_vars_func(func):
         if dset is not None:
             dset = MLDataset(dset)
             kwargs.update(dset.data_vars)
+
         kwargs.update(kw)
-        new_dset, args_kw = call_custom_func(func, *args, return_args_kw=True, **kwargs)
+        kwargs['return_args_kw'] = True
+        new_dset, args_kw = call_custom_func(func, *args, **kwargs)
         kwargs.update(args_kw)
         new_dset = _prepare_return_val(dset, new_dset, **kwargs)
         return new_dset

@@ -19,6 +19,7 @@ from __future__ import (absolute_import, division,
 
 import inspect
 import sys
+from collections import OrderedDict
 
 def get_args_kwargs_defaults(func):
     '''Get the required args, defaults, and var keywords of func
@@ -99,14 +100,10 @@ def filter_args_kwargs(func, *args, **kwargs):
     arg_spec, kwarg_spec, takes_variable_keywords = get_args_kwargs_defaults(func)
     args_kw = {}
     for idx, name in enumerate(arg_spec):
-        if len(args) > idx:
+        if idx < len(args):
             args_kw[name] = args[idx]
-        elif name in kw:
+        if name in kw:
             args_kw[name] = kw[name]
-        elif takes_variable_keywords:
-            pass
-        else:
-            raise ValueError('TODO - msg? {}'.format((idx, name, arg_spec, args, kwargs, args_kw, takes_variable_keywords)))
     for k, v in kw.items():
         if k in kwarg_spec or takes_variable_keywords:
             args_kw[k] = v
@@ -116,4 +113,11 @@ def filter_args_kwargs(func, *args, **kwargs):
     return args_kw
 
 
-__all__ = ['get_args_kwargs_defaults', 'filter_args_kwargs']
+
+def filter_kw_and_run_init(__init_method, **kw):
+    ___d = OrderedDict(locals())
+    kw = filter_args_kwargs(__init_method, **kw)
+    __init_method(**kw)
+
+
+__all__ = ['get_args_kwargs_defaults', 'filter_args_kwargs', 'filter_kw_and_run_init']

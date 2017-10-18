@@ -12,7 +12,7 @@ from xarray_filters.reshape import (to_features,
                                     from_features,
                                     concat_ml_features,
                                     has_features)
-from xarray_filters.constants import FEATURES_LAYER
+from xarray_filters.constants import FEATURES_LAYER, YNAME
 
 __all__ = ['MLDataset',]
 
@@ -66,9 +66,9 @@ class MLDataset(xr.Dataset):
         return yname
 
     def _extract_y_from_features(self, dset=None, y=None, features_layer=None,
-                                 yname=None, y1d=True, as_np=True):
+                                 yname=YNAME, y1d=True, as_np=True):
         features_layer = features_layer or FEATURES_LAYER
-        features_layer = has_features(dset, features_layer=features_layer)
+        features_layer = has_features(dset, features_layer=features_layer, raise_err=False)
         if dset is None:
             dset = self
         if features_layer:
@@ -93,13 +93,18 @@ class MLDataset(xr.Dataset):
             else:
                 return X.to_dataframe(), y.to_dataframe()
         else:
-            raise ValueError('TODO --- msg?')
+            raise ValueError('TODO --- msg? {}'.format((self, dset)))
 
     def to_array(self, y=None, features_layer=None, **kw):
         "Return X, y NumPy arrays with given shape"
-        features_layer = self.has_features(raise_err=False)
-        dset = self.to_features(features_layer=features_layer, **kw)
-        return self._extract_y_from_features(dset=dset, y=y, features_layer=features_layer, as_np=True)
+        features_layer = self.has_features(raise_err=False, features_layer=features_layer)
+        if not features_layer:
+            dset = self.to_features(features_layer=features_layer, **kw)
+        else:
+            dset = self
+        return self._extract_y_from_features(dset=dset, y=y,
+                                             features_layer=features_layer,
+                                             as_np=True)
 
 
     def to_dataframe(self, layers=None, yname=None):
