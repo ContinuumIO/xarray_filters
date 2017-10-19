@@ -16,7 +16,7 @@ import xarray as xr
 
 from xarray_filters.constants import FEATURES_LAYER_DIMS, FEATURES_LAYER
 from xarray_filters.multi_index import create_multi_index, multi_index_to_coords
-from xarray_filters.pipe_utils import for_each_array, call_custom_func
+from xarray_filters.pipe_utils import for_each_array
 
 __all__ = ['has_features',
            'concat_ml_features',

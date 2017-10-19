@@ -44,7 +44,6 @@ def data_vars_func(func):
             kwargs.update(dset.data_vars)
 
         kwargs.update(kw)
-        kwargs['return_args_kw'] = True
         new_dset, args_kw = call_custom_func(func, *args, **kwargs)
         kwargs.update(args_kw)
         new_dset = _prepare_return_val(dset, new_dset, **kwargs)
@@ -64,7 +63,7 @@ def for_each_array(func):
         else:
             raise ValueError('Expected a Dataset (or MLDataset) or dict as dset argument, but found argument of type {}'.format(type(dset)))
         for k, arr in items:
-            new_dset[k] = call_custom_func(func, arr, *args, **kw)
+            new_dset[k], _ = call_custom_func(func, arr, *args, **kw)
         new_dset = _prepare_return_val(dset, new_dset, **kw)
         return new_dset
     return new_func
@@ -74,7 +73,6 @@ def call_custom_func(*args, **kwargs):
     assert len(args) > 0, 'xarray_filters.pipe_utils.call_custom_func requires at least one argument'
     args = list(args)
     func = args.pop(0)
-    return_args_kw = kwargs.get('return_args_kw', False)
     if not callable(func):
         if args:
             arr = args.pop(0)
@@ -84,7 +82,5 @@ def call_custom_func(*args, **kwargs):
             raise ValueError('TODO -improve message- expected a DataArray in *args')
     args_kw = filter_args_kwargs(func, *args, **kwargs)
     output = func(**args_kw)
-    if return_args_kw:
-        return output, args_kw
-    return output
+    return output, args_kw
 
