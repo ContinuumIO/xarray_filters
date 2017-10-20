@@ -118,7 +118,7 @@ def _describe(idxes, values):
 
 def ts_describe(dset, axis=0, dim=None, layer=None,
                 names=None, keep_attrs=True, chunks=None):
-    '''scipy.describe on the `band` from kwargs
+    '''scipy.describe on the `layer` from kwargs
     that is a 3-D DataArray in X
     Parameters
     ----------

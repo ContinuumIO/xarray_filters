@@ -16,7 +16,7 @@ import xarray as xr
 
 from xarray_filters.constants import FEATURES_LAYER_DIMS, FEATURES_LAYER
 from xarray_filters.multi_index import create_multi_index, multi_index_to_coords
-from xarray_filters.pipe_utils import for_each_array, call_custom_func
+from xarray_filters.pipe_utils import for_each_array
 
 __all__ = ['has_features',
            'concat_ml_features',
@@ -67,10 +67,6 @@ def has_features(dset, raise_err=True, features_layer=None):
     >>> has_features(dset2) == 'features'
     True
     >>> has_features(dset1, raise_err=False)
-    >>> has_features(dset1, raise_err=True)
-    Traceback (most recent call last):
-        ...
-    ValueError: Expected an MLDataset/Dataset with DataArray "features" and dims ('space', 'layer')
     '''
     if features_layer is None:
         features_layer = FEATURES_LAYER
