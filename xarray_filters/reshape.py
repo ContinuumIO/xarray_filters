@@ -67,10 +67,7 @@ def has_features(dset, raise_err=True, features_layer=None):
     >>> has_features(dset2) == 'features'
     True
     >>> has_features(dset1, raise_err=False)
-    >>> has_features(dset1, raise_err=True)
-    Traceback (most recent call last):
-        ...
-    ValueError: Expected an MLDataset/Dataset with DataArray "features" and dims ('space', 'layer')
+    False
     '''
     if features_layer is None:
         features_layer = FEATURES_LAYER
