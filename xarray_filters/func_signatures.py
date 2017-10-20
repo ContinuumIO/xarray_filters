@@ -3,11 +3,11 @@
 
 ``elm.config.func_signatures``
 
-TODO - this file currently still exists in `earthio`
+TODO - this file currently still exists in `xarray_filters`
 but had modifications in xarray_filters PR 3.  Look at
-the the diff between earthio's and this one and see
+the the diff between xarray_filters's and this one and see
 how changes here in PR 3 affect usages elsewhere in
-elm / earthio.
+elm / xarray_filters.
 
 TODO: add doctests - confirm docstrings adequate
 

@@ -3,15 +3,12 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 '''
 ---------------------------------
 
-``earthio.filters.polygon_tools``
+``xarray_filters.filters.polygon_tools``
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 '''
 import numpy as np
 from numba import njit
-from matplotlib.path import Path
-import matplotlib.patches as patches
-import matplotlib.pyplot as plt
 
 # Implementation inspired by pseudo-code and pros at:
 # http://www.inf.usi.ch/hormann/papers/Hormann.2001.TPI.pdf
@@ -196,17 +193,3 @@ def vec_points_in_polys(x_vec, y_vec, polys, inon=True, closedPolys=False):
     return inpoly
 
 
-def plot_poly(plt, poly_x, poly_y):
-    # Debug helper, will plot a polygon into plt's gcf
-    length = len(poly_x) + 1
-    pthcode = [Path.LINETO] * length
-    pthcode[0] = Path.MOVETO
-    pthcode[-1] = Path.CLOSEPOLY
-    q = np.zeros([length, 2])
-    q[:-1, 0] = poly_x
-    q[:-1, 1] = poly_y
-    q[-1, 0] = poly_x[0]
-    q[-1, 1] = poly_y[0]
-    path = Path(q, pthcode)
-    patch = patches.PathPatch(path, facecolor='green', lw=2, alpha=0.3)
-    plt.gca().add_patch(patch)
