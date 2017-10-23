@@ -14,4 +14,4 @@ dependencies:
  - xarray
  - six
  - pip:
-    - "--editable=git+https://github.com/dask/dask-glm.git@master#egg=dask-glm_master"
+    - "--editable=git+https://github.com/dask/dask-ml.git@master#egg=dask-ml_master"
