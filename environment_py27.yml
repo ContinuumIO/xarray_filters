@@ -6,6 +6,7 @@ dependencies:
  - python=2.7
  - dask
  - funcsigs
+ - numba
  - numpy
  - pandas
  - pytest

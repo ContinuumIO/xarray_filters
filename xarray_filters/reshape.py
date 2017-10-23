@@ -16,7 +16,7 @@ import xarray as xr
 
 from xarray_filters.constants import FEATURES_LAYER_DIMS, FEATURES_LAYER
 from xarray_filters.multi_index import create_multi_index, multi_index_to_coords
-from xarray_filters.pipe_utils import for_each_array, call_custom_func
+from xarray_filters.pipe_utils import for_each_array
 
 __all__ = ['has_features',
            'concat_ml_features',
@@ -67,20 +67,14 @@ def has_features(dset, raise_err=True, features_layer=None):
     >>> has_features(dset2) == 'features'
     True
     >>> has_features(dset1, raise_err=False)
-    >>> has_features(dset1, raise_err=True)
-    Traceback (most recent call last):
-        ...
-    ValueError: Expected an MLDataset/Dataset with DataArray "features" and dims ('space', 'layer')
     '''
     if features_layer is None:
         features_layer = FEATURES_LAYER
-    arr = getattr(dset, features_layer, None)
-    if arr is None or not hasattr(arr, 'dims') or tuple(arr.dims) !=  FEATURES_LAYER_DIMS:
-        msg = 'Expected an MLDataset/Dataset with DataArray "{}" and dims {}'
+    if features_layer not in dset.data_vars:
         if raise_err:
-            raise ValueError(msg.format(features_layer, FEATURES_LAYER_DIMS))
-        else:
-            return None
+            raise ValueError('{} DataArray is not in dset (found {})'.format(features_layer, dset.data_vars.keys()))
+        return None
+    arr = dset[features_layer]
     return features_layer
 
 
@@ -238,8 +232,6 @@ def from_features(arr, axis=0):
       ...
     '''
     from xarray_filters.mldataset import MLDataset
-    if arr.ndim > 2:
-        raise ValueError('Expected 2D input arr but found {}'.format(arr.shape))
     coords, dims = multi_index_to_coords(arr, axis=axis)
     simple_axis = 0 if axis == 1 else 1
     simple_dim = arr.dims[simple_axis]
@@ -290,9 +282,8 @@ def concat_ml_features(*dsets, **kwargs):
     '''
     features_layer = kwargs.get('features_layer', FEATURES_LAYER)
     concat_dim = kwargs.get('concat_dim', None)
-    keep_attrs = kwargs.get('keep_attrs', False)
+    keep_attrs = kwargs.get('keep_attrs', False) # TODO True or False (convention?)
 
-    # TODO True or False (convention?)
     from xarray_filters.mldataset import MLDataset
     if not dsets:
         raise ValueError('No MLDataset / Dataset arguments passed.  Expected >= 1')

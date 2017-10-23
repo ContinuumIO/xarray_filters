@@ -249,14 +249,14 @@ class NpXyTransformer:
         if not layers:
             layers = ['X' + str(n) for n in range(nfeatures)]
         # store features X in dataset
-        ds = xr.Dataset(attrs=attrs)
-        for (layer, col) in zip(layers, self.X.T):
-            ds[layer] = xr.DataArray(data=col.reshape(shape), coords=new_coords, dims=new_dims)
+        ds = OrderedDict()
+        for (xname, col) in zip(layers, self.X.T):
+            ds[xname] = xr.DataArray(data=col.reshape(shape), coords=new_coords, dims=new_dims)
         # store label y
         if not yname:
             yname = 'y'
         ds[yname] = xr.DataArray(data=self.y.reshape(shape), coords=new_coords, dims=new_dims)
-        return ds
+        return xr.Dataset(ds, attrs=attrs)
 
     def to_mldataset(self, coords=None, dims=None, attrs=None, shape=None, layers=None, yname=None):
         """Return an MLDataset with given shape, coords/dims/var names.
@@ -298,7 +298,7 @@ class NpXyTransformer:
                                yname=yname)
         return MLDataset(dset)
 
-    def astype(self, to_type, **kwargs):
+    def astype(self, astype, **kwargs):
         """Convert to given type.
 
         self.astype(f, **kwargs) calls self.to_f(**kwargs)
@@ -314,8 +314,8 @@ class NpXyTransformer:
         NpXyTransformer.to_*
         etc...
         """
-        assert to_type in self.__class__.accepted_types
-        to_method_name = 'to_' + to_type
+        assert astype in self.__class__.accepted_types
+        to_method_name = 'to_' + astype
         to_method = getattr(self, to_method_name)
         return to_method(**kwargs)
 
@@ -442,7 +442,7 @@ def _make_base(skl_sampler_func):
         if astype is None:
             sim_data = Xyt
         else:
-            sim_data = Xyt.astype(to_type=astype, **type_kwargs)
+            sim_data = Xyt.astype(astype=astype, **type_kwargs)
 
         return sim_data
 

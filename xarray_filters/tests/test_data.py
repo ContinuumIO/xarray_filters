@@ -21,12 +21,13 @@ def iqr_standard(arr, **kw):
     return (arr - median) / (upper - lower)
 
 
-def ts_clustering_example(n_features=20, shape=(200, 10, 10)):
+def ts_clustering_example(n_features=20, layers=None, shape=(200, 10, 10)):
+    if layers is None:
+        layers = tuple('layer_{}'.format(idx) for idx in range(n_features))
     return MLDataset(make_blobs(n_samples=np.prod(shape),
                                 shape=shape,
                                 n_features=n_features,
-                                layers=('layer_{}'.format(idx)
-                                        for idx in range(n_features))))
+                                layers=layers))
 
 
 ## The following are "spec" arguments to build_run_spec for testing
@@ -76,7 +77,7 @@ a = lambda: xr.DataArray(r(), coords=c(), dims=dims)
 new_test_dataset = lambda layers: MLDataset(OrderedDict([(layer, a()) for layer in layers]))
 
 
-extras = ['new_test_dataset', 'TEST_LAYERS', 'iqr_standard']
+extras = ['new_test_dataset', 'TEST_LAYERS', 'iqr_standard', 'ts_clustering_example']
 
 
 __all__ = [name for name in tuple(globals().keys())
