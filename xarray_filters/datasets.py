@@ -156,7 +156,7 @@ class NpXyTransformer:
         Examples
         --------
         >>> transformer = make_blobs(n_samples=4, n_features=3, random_state=0,
-        ...     astype=None)
+        ...     astype=None, chunks=2)
         >>> X, y = transformer.to_array()
         >>> X.shape
         (4, 3)
@@ -188,7 +188,7 @@ class NpXyTransformer:
         Examples
         --------
         >>> transformer = make_regression(n_samples=5, n_features=2, random_state=0,
-        ...     astype=None)
+        ...     astype=None, chunks=2)
         >>> df = transformer.to_dataframe(layers=['temp', 'pressure'], yname='humidity')
         >>> type(df)
         <class 'pandas.core.frame.DataFrame'>
@@ -311,7 +311,9 @@ class NpXyTransformer:
         NpXyTransformer.to_*
         etc...
         """
-        if astype:
+        if astype is None:
+            return self
+        else:
             assert astype in self.__class__.accepted_types
         to_method_name = 'to_' + astype
         to_method = getattr(self, to_method_name)
@@ -319,7 +321,7 @@ class NpXyTransformer:
 
 
 def _make_base(skl_sampler_func):
-    """Maps a make_* function from sklearn.datasets to an extension.
+    """Maps a make_* function from sklearn.datasets to an extension of that function.
 
     The extended version of the function implements transformations through the
     various `NpXyTransformer.to_*` methods, enabled in the new function via the
@@ -359,7 +361,7 @@ def _make_base(skl_sampler_func):
 
     >>> make_classification = _make_base(sklearn.datasets.make_classification)
     >>> Xskl, yskl = sklearn.datasets.make_classification(random_state=0)
-    >>> our_data = make_classification(random_state=0, astype='array')
+    >>> our_data = make_classification(random_state=0, astype='mldataset')
     >>> np.allclose(Xskl[:, 0], our_data['X0'])  # comparing floats
     True
     >>> np.allclose(Xskl[:, 1], our_data['X1'])  # comparing floats
@@ -396,7 +398,7 @@ def _make_base(skl_sampler_func):
         skl_argspec = inspect.getfullargspec(skl_sampler_func)
         ndefaults = len(skl_argspec.defaults) if skl_argspec.defaults else 0
         checks = [
-            (not skl_argspec.varargs, "{} has variable positional arguments".format(skl_sampler_func.__name__)),
+            (not skl_argspec.varargs, ),
             (not skl_argspec.kwonlyargs, "{} has keyword-only arguments".format(skl_sampler_func.__name__))
         ]
         mandatory_args = skl_argspec.args[:-ndefaults] # last ndefaults args are optional / have default value
@@ -416,14 +418,10 @@ def _make_base(skl_sampler_func):
             (not skl_argspec.varargs, "{} has variable positional arguments".format(skl_sampler_func.__name__))
         ]
 
-    # We are not allowing *args in the signature of skl_sampler_func; we can check that by asserting that
-    # skl_argspec.varargs is False. Similarly for keyword-only arguments (supported only by Python 3 anyway).
-    # That is identified with a False value for skl_argspec.kwonlyargs
-    for condition, msg in checks:
-        try:
-            assert condition
-        except AssertionError:
-            logger.warning(msg)
+    # We are not capturing info from *args in the signature of skl_sampler_func; we can check that there are no
+    # *args by asserting that skl_argspec.varargs is False.
+    if skl_argspec.varargs:
+        logger.warning("{} has variable positional arguments".format(skl_sampler_func.__name__))
 
     default_astype = 'mldataset'
     def wrapper(*args, **kwargs):
@@ -461,11 +459,9 @@ def _make_base(skl_sampler_func):
         Xyt = NpXyTransformer(X, y)
 
         # Step 3: convert the data to the desired type
-        astype = type_kwargs.get('astype', None)
-        if not astype:
-            sim_data = Xyt
-        else:
-            sim_data = Xyt.astype(**type_kwargs)
+        if 'astype' not in type_kwargs:
+            type_kwargs['astype'] = default_astype
+        sim_data = Xyt.astype(**type_kwargs)
         return sim_data
 
     # We now have some tasks: (1) fix the docstring and (2) fix the signature of `wrapper`.
