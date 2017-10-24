@@ -16,7 +16,7 @@ class PatchInitSig(type):
         setattr_section_strs = []
         params_to_keep = []
         for param, val in attr.items():
-            if param not in ('transform',):
+            if param not in ('transform','fit', 'fit_transform', 'score', 'predict'):
                 if not param.startswith('_'):
                     setattr_section_strs.append('self.{0} = {0}'.format(param))
                     params_to_keep.append(param)
@@ -45,6 +45,28 @@ class Step(six.with_metaclass(PatchInitSig,
     """
     def transform(self, X, y=None, **params):
         """This method must be overridden by subclasses of Step."""
+
+
+class Generic(Step):
+    func = None
+    kw = None
+
+    def transform(self, X, y=None, **params):
+        p1 = self.get_params()
+        func = p1.pop('func', self.func)
+        kw = p1.pop('kw', {}) or {}
+        kw.update(params)
+        kw.update(p1)
+        if not func:
+            raise ValueError('TODO message')
+        return func(X, y=y, **kw)
+
+    def fit(self, X, y=None, **params):
+        return self.transform(X, y=y, **params)
+
+    def fit_transform(self, X, y=None, **params):
+        return self.transform(X, y=y, **params)
+
 
 class WriteNetCDF(Step):
     fname = ''
