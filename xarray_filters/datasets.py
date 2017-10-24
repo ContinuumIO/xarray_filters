@@ -65,7 +65,8 @@ signature.
 In a nutshell, the higher level API is like
 
 >>> m = make_blobs(n_samples=5, n_features=2,  # sklearn args
-...     layers=['feat_1', 'feat_2'])  # new args
+...     chunks=2,                              # dask_ml args
+...     layers=['feat_1', 'feat_2'])           # new args
 
 The full list of converted functions from sklearn is in _converted_make_funcs:
 >>> sorted(_converted_make_funcs.keys())  # doctest: +NORMALIZE_WHITESPACE +SKIP
@@ -107,6 +108,8 @@ from collections import OrderedDict
 
 import dask_ml.datasets
 import numpy as np
+import dask.array as da
+import dask.dataframe as ddf
 import pandas as pd
 import sklearn.datasets
 import xarray as xr
@@ -160,9 +163,9 @@ class NpXyTransformer:
         >>> X, y = transformer.to_array()
         >>> X.shape
         (4, 3)
-        >>> X, y = transformer.to_array(xshape=(6, 2))
+        >>> X, y = transformer.to_array(xshape=(12, 1))
         >>> X.shape
-        (6, 2)
+        (12, 1)
         """
         if xshape:
             X, y = self.X.reshape(xshape), self.y
@@ -200,7 +203,12 @@ class NpXyTransformer:
             layers = ['X' + str(n) for n in range(nfeatures)]
         if not yname:
             yname = 'y'
-        df = pd.DataFrame(self.X, columns=layers)
+        if isinstance(self.X, da.core.Array):
+            df = ddf.from_array(self.X, columns=layers)
+        elif isinstance(self.X, np.ndarray):
+            df = pd.DataFrame(self.X, columns=layers)
+        else:
+            raise ValueError("self.X must be dask or numpy array.")
         df[yname] = self.y
         return df
 
@@ -379,12 +387,12 @@ def _make_base(skl_sampler_func):
     regression exercise with
 
     >>> df1 = make_regression(n_samples=5, n_features=2, random_state=0,
-    ...     astype='dataframe', layers=['thing1', 'thing2'])
+    ...     astype='dataframe', layers=['thing1', 'thing2'], chunks=2)
 
     or, equivalently,
 
     >>> transformer = make_regression(n_samples=5, n_features=2, random_state=0,
-    ...     astype=None)  #  this is a NpXyTransformer object
+    ...     astype=None, chunks=2)  #  this is a NpXyTransformer object
     >>> df2 = transformer.to_dataframe(layers=['thing1', 'thing2'])
 
     Verifying:
@@ -560,7 +568,7 @@ Attributes:
 
 # Convert all sklearn functions that admit conversion
 _converted_make_funcs = dict()  # holds converted sklearn funcs
-_sampling_source_packages = [dask_ml.datasets, sklearn.datasets][1:]  # give priority to packages that come first
+_sampling_source_packages = [dask_ml.datasets, sklearn.datasets]  # give priority to packages that come first
 _sampling_funcs = {f for pkg in _sampling_source_packages for f in dir(pkg) if f.startswith('make_')}  # conversion candidates
 for func_name in _sampling_funcs:
     func = get_first_matching_attribute(objs=_sampling_source_packages, name=func_name)
