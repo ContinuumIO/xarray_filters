@@ -425,15 +425,6 @@ def _make_base(skl_sampler_func):
         except AssertionError:
             logger.warning(msg)
 
-    # First we need to infer the correct module for the function.
-    # That is because we cannot obtain it from the signature, due to the way dask_ml implements things now.
-    # TODO: when dask_ml.datasets.skl_sampler_func functions report skl_sample_func.__module__ correctly
-    # use skl_sample_func.__module__ instead of modname, making this if/else block will go away.
-    if {'args', 'kwargs', 'chunks'}.issubset(skl_sampler_func.__code__.co_varnames):  # test if skl_sampler_func belongs in dask_ml.datasets
-        modname = 'dask_ml.datasets'
-    else:
-        modname = skl_sampler_func.__module__
-
     default_astype = 'mldataset'
     def wrapper(*args, **kwargs):
         '''
@@ -452,11 +443,6 @@ def _make_base(skl_sampler_func):
         type_kwargs = {k: val for (k, val) in kwargs.items() if k not in skl_argspec.args}
         if 'shape' in type_kwargs:
             skl_kwargs['n_samples'] = np.prod(type_kwargs['shape'])
-        # This if block is a temporary fix until dask_ml.datasets provides proper signatures for the sampling functions.
-        # Remove the whole block once that bug is fixed in dask_ml. See https://github.com/dask/dask-ml/issues/58
-        if 'chunks' in type_kwargs:
-            skl_kwargs['chunks'] = type_kwargs['chunks']
-            del type_kwargs['chunks']
 
         # Step 1: obtain the X, y data from skl_sampler_func
         # First we need to check that we can handle the output of skl_sampler_func
@@ -505,7 +491,7 @@ def _make_base(skl_sampler_func):
     {xy_transformer}
 
     """.format(
-            skl_funcname=(modname + '.' + skl_sampler_func.__name__),
+            skl_funcname=(skl_sampler_func.__module__ + '.' + skl_sampler_func.__name__),
             xy_transformer=(NpXyTransformer.__module__ + '.' + NpXyTransformer.__name__),
             accepted_types=(str(NpXyTransformer.accepted_types))
 
