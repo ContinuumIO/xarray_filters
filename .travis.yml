@@ -25,6 +25,7 @@ install:
     - source activate $ENV_NAME
 
 before_script:
+    - conda install -y requests jinja2
     - ./fetch_dask-ml.py # Fetch dask-ml recipe from conda-forge
 
 script:
