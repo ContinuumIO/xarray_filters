@@ -20,6 +20,9 @@ requirements:
     - dask
     - scikit-learn
     - six
+    - dask_ml
+    - attrs
+    - rasterio
 
 about:
   home: http://github.com/ContinuumIO/xarray_filters

@@ -24,8 +24,11 @@ install:
     - conda create $CHANNELS --name $ENV_NAME python=$PYTHON numpy=$NUMPY
     - source activate $ENV_NAME
 
+before_script:
+    - ./fetch_dask-ml.py # Fetch dask-ml recipe from conda-forge
+
 script:
-    - conda build --python $PYTHON --numpy $NUMPY conda.recipe
+    - conda build -c conda-forge --python $PYTHON --numpy $NUMPY conda.recipe
 
 notifications:
   on_success: change
