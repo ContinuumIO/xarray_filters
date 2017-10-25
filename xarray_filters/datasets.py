@@ -1,3 +1,5 @@
+from __future__ import absolute_import, division, print_function, unicode_literals
+
 """
 Overview
 --------
@@ -101,7 +103,6 @@ the keyword `astype`) is
 """
 
 
-
 import inspect
 import logging
 from collections import OrderedDict
@@ -124,7 +125,7 @@ logging.basicConfig()
 logger = logging.getLogger(__name__)
 
 
-class NpXyTransformer:
+class NpXyTransformer(object):
     "Transforms a pair (feature_matrix, labels_vector) with to_* methods."
     # Transform methods are to_f where f in accepted types
     accepted_types = ('array', 'dataframe', 'dataset', 'mldataset')

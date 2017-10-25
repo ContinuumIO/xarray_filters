@@ -16,7 +16,9 @@ class PatchInitSig(type):
         setattr_section_strs = []
         params_to_keep = []
         for param, val in attr.items():
-            if param not in ('transform','fit', 'fit_transform', 'score', 'predict'):
+            if callable(val) or isinstance(val, classmethod):
+                continue
+            if param not in ('transform', 'fit', 'fit_transform', 'score', 'predict'):
                 if not param.startswith('_'):
                     setattr_section_strs.append('self.{0} = {0}'.format(param))
                     params_to_keep.append(param)
@@ -30,7 +32,8 @@ class PatchInitSig(type):
     self.fit_transform = self.transform
 '''.format(', '.join(['{}={}'.format(p, repr(attr[p])) for p in params_to_keep]),
            '\n    '.join(setattr_section_strs))
-            #print(init_method_str)
+            # print('@@@', name)
+            # print('@@@', init_method_str)
             exec(init_method_str) in globals(), locals()
             attr['__init__'] = locals()['init_method_withargs']
         return super(PatchInitSig, cls).__new__(cls, name, bases, attr)

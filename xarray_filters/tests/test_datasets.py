@@ -28,4 +28,3 @@ def test_make_blobs():
     dimshape3 = dict(zip(params3['dims'], params3['shape']))
     for k in blobs3.dims:
         assert blobs3.dims[k] == dimshape3[k]
-

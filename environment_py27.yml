@@ -14,5 +14,8 @@ dependencies:
  - scikit-learn
  - xarray
  - six
+ - attrs
+ - conda-forge::rasterio
+ - conda-forge::gdal=2.1.*
  - pip:
     - "--editable=git+https://github.com/dask/dask-ml.git@master#egg=dask-ml_master"
