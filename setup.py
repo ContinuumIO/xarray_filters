@@ -12,6 +12,6 @@ setup(name='xarray_filters',
       description='Readers',
       include_package_data=True,
       install_requires=[],
-      packages=['xarray_filters'],
+      packages=['xarray_filters', 'xarray_filters.tests'],
       package_data={},
       entry_points={})

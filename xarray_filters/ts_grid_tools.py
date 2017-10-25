@@ -16,6 +16,7 @@ import numpy as np
 import pandas as pd
 from scipy.stats import describe as scipy_describe
 import xarray as xr
+import six
 
 from xarray_filters.constants import (FEATURES_LAYER_DIMS,
                                       FEATURES_LAYER,
@@ -41,7 +42,7 @@ def _validate_dims_axis(axis, dim, dims, shape):
 def _validate_layer(dset, layer):
     if layer is None:
         layer = tuple(dset.data_vars)
-    elif isinstance(layer, str):
+    elif isinstance(layer, six.string_types):
         layer = (layer,)
     return layer
 
