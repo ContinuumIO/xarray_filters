@@ -405,10 +405,6 @@ def _make_base(skl_sampler_func):
     if PY3:
         skl_argspec = inspect.getfullargspec(skl_sampler_func)
         ndefaults = len(skl_argspec.defaults) if skl_argspec.defaults else 0
-        checks = [
-            (not skl_argspec.varargs, ),
-            (not skl_argspec.kwonlyargs, "{} has keyword-only arguments".format(skl_sampler_func.__name__))
-        ]
         mandatory_args = skl_argspec.args[:-ndefaults] # last ndefaults args are optional / have default value
         optional_args = skl_argspec.args[-ndefaults:]
         var_kwargs = skl_argspec.varkw
@@ -422,9 +418,6 @@ def _make_base(skl_sampler_func):
             skl_params.append(Parameter(name=var_kwargs, kind=Parameter.VAR_KEYWORD))
     if PY2:
         skl_argspec = inspect.getargspec(skl_sampler_func)
-        checks = [
-            (not skl_argspec.varargs, "{} has variable positional arguments".format(skl_sampler_func.__name__))
-        ]
 
     # We are not capturing info from *args in the signature of skl_sampler_func; we can check that there are no
     # *args by asserting that skl_argspec.varargs is False.
