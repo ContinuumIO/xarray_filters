@@ -124,7 +124,7 @@ logging.basicConfig()
 logger = logging.getLogger(__name__)
 
 
-class NpXyTransformer:
+class NpXyTransformer(object):
     "Transforms a pair (feature_matrix, labels_vector) with to_* methods."
     # Transform methods are to_f where f in accepted types
     accepted_types = ('array', 'dataframe', 'dataset', 'mldataset')
@@ -380,6 +380,7 @@ def _make_base(skl_sampler_func):
         assert not skl_argspec.varargs, "{} has variable positional arguments".format(skl_sampler_func.__name__)
         assert len(skl_argspec.args) == len(skl_argspec.defaults), \
                 "Some args of {} have no default value".format(skl_sampler_func.__name__)
+
     default_astype = 'mldataset'
     def wrapper(*args, **kwargs):
         '''
