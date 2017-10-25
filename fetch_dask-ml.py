@@ -5,7 +5,7 @@ import sys
 import requests
 import jinja2
 
-recipe_dpath = './dask-ml'
+recipe_dpath = './dask_ml'
 meta_yml_fpath = os.path.join(recipe_dpath, 'meta.yaml')
 if os.path.isfile(meta_yml_fpath):
     print('Recipe exists: skipping download.')
