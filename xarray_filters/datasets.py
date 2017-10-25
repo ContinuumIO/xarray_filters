@@ -119,8 +119,6 @@ from xarray_filters.mldataset import MLDataset
 from xarray_filters.pycompat import PY2, PY3
 from xarray_filters.utils import _infer_coords_and_dims, get_first_matching_attribute
 
-Parameter = inspect.Parameter
-
 logging.basicConfig()
 logger = logging.getLogger(__name__)
 
@@ -410,13 +408,13 @@ def _make_base(skl_sampler_func):
         optional_args = skl_argspec.args[-ndefaults:]
         var_kwargs = skl_argspec.varkw
         # we do not suport *args, that is, skl_argspec.varargs
-        skl_params = [Parameter(name=pname, kind=Parameter.POSITIONAL_OR_KEYWORD, default=Parameter.empty)
+        skl_params = [inspect.Parameter(name=pname, kind=inspect.Parameter.POSITIONAL_OR_KEYWORD, default=inspect.Parameter.empty)
                       for pname in mandatory_args]
         if ndefaults > 0:
-            skl_params.extend([Parameter(name=pname, kind=Parameter.POSITIONAL_OR_KEYWORD, default=pdefault)
+            skl_params.extend([inspect.Parameter(name=pname, kind=inspect.Parameter.POSITIONAL_OR_KEYWORD, default=pdefault)
                           for (pname, pdefault) in zip(optional_args, skl_argspec.defaults)])
         if var_kwargs:
-            skl_params.append(Parameter(name=var_kwargs, kind=Parameter.VAR_KEYWORD))
+            skl_params.append(inspect.Parameter(name=var_kwargs, kind=inspect.Parameter.VAR_KEYWORD))
     if PY2:
         skl_argspec = inspect.getargspec(skl_sampler_func)
 
@@ -500,11 +498,11 @@ def _make_base(skl_sampler_func):
         # Task 2 of 2: fixing the signature of `wrapper`, difficult to do in Python 2
         # because the needed features in the inspect module are available only
         # in Python 3
-        astype_param = Parameter(name='astype', kind=Parameter.KEYWORD_ONLY, default=default_astype)
+        astype_param = inspect.Parameter(name='astype', kind=inspect.Parameter.KEYWORD_ONLY, default=default_astype)
         if skl_params[-1].kind.name == 'VAR_KEYWORD':  # if function already have a **kwargs style argument, preserve it
             params = skl_params[:-1] + [astype_param] + skl_params[-1:]
         else:  # add a **kwargs for use by the NpXyTransformer.astype calls
-            kwargs_param = Parameter(name='kwargs', kind=Parameter.VAR_KEYWORD)
+            kwargs_param = inspect.Parameter(name='kwargs', kind=inspect.Parameter.VAR_KEYWORD)
             params = skl_params + [astype_param, kwargs_param]
         wrapper.__signature__ = inspect.Signature(params)
     return wrapper
