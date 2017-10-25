@@ -9,7 +9,7 @@ recipe_dpath = './dask-ml'
 if os.path.isdir(recipe_dpath):
     print('Recipe exists: skipping download.')
 
-meta_yml_url = 'https://raw.githubusercontent.com/TomAugspurger/staged-recipes/fea51d28eefc935a620575c5c00cc679f0a79766/recipes/dask-ml/meta.yaml'
+meta_yml_url = 'https://raw.githubusercontent.com/TomAugspurger/staged-recipes/dask-ml/recipes/dask-ml/meta.yaml'
 resp = requests.get(meta_yml_url)
 assert resp.status_code == 200, 'Error fetching meta.yaml file'
 template = jinja2.Template(resp.text)
