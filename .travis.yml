@@ -11,12 +11,6 @@ env:
     - PYTHON=3.5 NUMPY=1.11
     - PYTHON=2.7 NUMPY=1.11
 
-matrix:
-  # Python 2.7 doesn't work yet, due to reliance on Python 3.6 features in the
-  # inspect stdlib
-  allow_failures:
-    - env: PYTHON=2.7 NUMPY=1.11
-
 install:
     - wget http://repo.continuum.io/miniconda/Miniconda-latest-Linux-x86_64.sh -O miniconda.sh
     - bash miniconda.sh -b -p $HOME/miniconda

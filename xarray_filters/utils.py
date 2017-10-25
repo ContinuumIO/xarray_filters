@@ -1,6 +1,9 @@
+from __future__ import absolute_import, division, print_function, unicode_literals
+
 from collections import OrderedDict, defaultdict
 from xarray.core.indexing import PandasIndexAdapter
 from xarray.core.variable import as_variable
+import six
 
 
 def is_dict_like(value):
@@ -53,7 +56,7 @@ def _infer_coords_and_dims(shape, coords, dims):
                          'which does not match the %s dimensions of the '
                          'data' % (len(coords), len(shape)))
 
-    if isinstance(dims, str):
+    if isinstance(dims, six.string_types):
         dims = (dims,)
 
     if dims is None:
@@ -71,7 +74,7 @@ def _infer_coords_and_dims(shape, coords, dims):
         dims = tuple(dims)
     else:
         for d in dims:
-            if not isinstance(d, str):
+            if not isinstance(d, six.string_types):
                 raise TypeError('dimension %s is not a string' % d)
 
     new_coords = OrderedDict()
