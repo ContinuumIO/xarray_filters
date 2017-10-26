@@ -1,6 +1,8 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import logging
 from collections import OrderedDict, defaultdict
+
 from xarray.core.indexing import PandasIndexAdapter
 from xarray.core.variable import as_variable
 import six
@@ -106,3 +108,17 @@ def _infer_coords_and_dims(shape, coords, dims):
     return new_coords, dims
 
 
+def get_first_matching_attribute(objs, name):
+    """Returns attribute for first obj in objs that has that attribute.
+
+    Like getattr, but accepts a list of objects to search for the attribute `name`;
+    returns the first found attribute.
+    """
+    for obj in objs:
+        try:
+            attribute = getattr(obj, name)
+        except AttributeError:
+            errmsg = "Object {} does not have attribute {}"
+            logging.info(errmsg.format(str(obj), name))
+        else:
+           return attribute

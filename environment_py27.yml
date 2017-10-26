@@ -1,5 +1,6 @@
 name: xarray_filters_py27
 channels:
+ - defaults
  - conda-forge # essential for rasterio on osx
 dependencies:
  - python=2.7
@@ -16,3 +17,8 @@ dependencies:
  - attrs
  - conda-forge::rasterio
  - conda-forge::gdal=2.1.*
+ - cython # for dask-ml
+ - requests # for fetching dask-ml recipe
+ - jinja2 # for fetching dask-ml recipe
+ - pip:
+    - "--editable=git+https://github.com/dask/dask-ml.git@master#egg=dask-ml_master"

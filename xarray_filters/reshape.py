@@ -92,6 +92,8 @@ def to_features(dset, layers=None, row_dim=None,
     ----------
 
     dset: xarray.Dataset or xarray_filters.MLDataset
+        We assume each xarray.DataArray in dset
+        has the same coords/dims.
     row_dim: Name of the row dimension created by flattening the
              coordinate arrays of each xarray.DataArray in dset.
              The row dimension has a pandas.MultiIndex, e.g. if
@@ -110,9 +112,6 @@ def to_features(dset, layers=None, row_dim=None,
             (see comment at top of module)
     astype: MLDataset instance by default or one of:
             ('DataFrame', 'numpy', 'DataArray', 'Dataset')
-
-    It is assumed each xarray.DataArray in dset
-    has the same coords/dims.
 
     Returns
     -------
