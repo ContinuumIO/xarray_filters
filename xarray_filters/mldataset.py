@@ -110,6 +110,7 @@ class MLDataset(xr.Dataset):
     def to_dataframe(self, layers=None, yname=None):
         "Return a dataframe with features/labels optionally named."
         features_layer = self.has_features(raise_err=False)
+        df = super(MLDataset, self).to_dataframe()
         df[yname] = self.y
         return df
 
