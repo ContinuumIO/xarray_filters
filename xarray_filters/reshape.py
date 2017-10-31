@@ -238,8 +238,23 @@ def from_features(arr, axis=0):
     simple_np_arr = getattr(arr, simple_dim).values
     shp = tuple(coords[dim].size for dim in dims)
     dset = OrderedDict()
+    n_elts_needed = np.prod(shp)
     for j in range(simple_np_arr.size):
-        val = arr[:, j].values.reshape(shp)
+        arr_val = arr[:, j].values
+        n_arr_vals = len(arr_val)
+        assert n_arr_vals <= n_elts_needed
+        if n_arr_vals < n_elts_needed:
+            val = np.full(shp, np.nan)
+            feature_names = list(arr.indexes.keys())
+            for feature_name in feature_names:
+                feature_idx = arr.indexes[feature_name]
+                if not isinstance(feature_idx, pd.MultiIndex):
+                    continue
+                dim_coord_pairs = feature_idx.tolist()
+                for idx, dim_coord_pair in enumerate(dim_coord_pairs):
+                    val[dim_coord_pair] = arr_val[idx]
+        else:
+            val = arr_val.reshape(shp)
         layer = simple_np_arr[j]
         dset[layer] = xr.DataArray(val, coords=coords, dims=dims)
     return MLDataset(dset)

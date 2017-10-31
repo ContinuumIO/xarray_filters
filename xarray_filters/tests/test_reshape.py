@@ -120,5 +120,31 @@ def test_data_vars_keywords_positional(layers):
     else:
         assert len(X2.data_vars)
 
+def test_from_features_dropped_rows():
+    X = MLDataset({'pressure': xr.DataArray(np.random.uniform(0, 1, (2,3)),
+                                            coords={'x': np.arange(2),
+                                                    'y': np.arange(3)},
+                                            dims=['x', 'y']),
+                   'temperature': xr.DataArray(np.random.uniform(0, 1, (2,3)),
+                                               coords={'x': np.arange(2),
+                                                       'y': np.arange(3)},
+                                               dims=['x', 'y'])})
 
+    features = X.to_features()
+    data1 = features.from_features()
 
+    # Assert that we get the original Dataset back after X.to_features().from_features()
+    assert np.array_equal(data1.coords.to_index().values, X.coords.to_index().values)
+    assert np.allclose(data1.to_array()[0], X.to_array()[0])
+
+    # Drop some rows
+    features['features'].values[:2, :] = np.nan
+    zerod_vals_copy = features['features'].values[:] # Copy NaN positions for testing later on
+    features = features.dropna('space')
+
+    # Convert back to original dataset, padding NaN values into the proper locations
+    data2 = features.from_features()
+
+    # Assert that the coords are correct, and NaNs are in the right places
+    assert np.array_equal(data2.coords.to_index().values, data1.coords.to_index().values)
+    assert np.allclose(data2.to_array()[0], zerod_vals_copy, equal_nan=True)
