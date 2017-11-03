@@ -564,7 +564,7 @@ try:
     import dask_ml.datasets as dask_ml_datasets
 except:
     dask_ml_datasets = None
-_sampling_source_packages = tuple(filter(None, [dask_ml.datasets, sklearn.datasets]))
+_sampling_source_packages = tuple(filter(None, [dask_ml_datasets, sklearn.datasets]))
 _sampling_funcs = {f for pkg in _sampling_source_packages for f in dir(pkg) if f.startswith('make_')}  # conversion candidates
 for func_name in _sampling_funcs:
     func = get_first_matching_attribute(objs=_sampling_source_packages, name=func_name)
