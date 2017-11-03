@@ -20,7 +20,7 @@ requirements:
     - dask
     - scikit-learn
     - six
-    - attrs
+    - dask-ml
     - rasterio
 
 about:
