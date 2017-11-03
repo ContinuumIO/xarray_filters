@@ -107,7 +107,6 @@ import inspect
 import logging
 from collections import OrderedDict
 
-import dask_ml.datasets
 import numpy as np
 import dask.array as da
 import dask.dataframe as ddf
@@ -561,7 +560,12 @@ Attributes:
 # Convert all sklearn functions that admit conversion
 _converted_make_funcs = dict()  # holds converted sklearn funcs
 #_sampling_source_packages = [dask_ml.datasets, sklearn.datasets]  # give priority to packages that come first
-_sampling_source_packages = [dask_ml.datasets, sklearn.datasets][1:] # TODO: this is a hack to get tests passing before Gui leaves. TODO: get the line above this one working
+try:
+    import dask_ml.datasets as dask_ml_datasets
+except:
+    dask_ml_datasets = None
+# TODO - adjust the line below when dask-ml is in requirements
+_sampling_source_packages = [dask_ml_datasets, sklearn.datasets][1:]
 _sampling_funcs = {f for pkg in _sampling_source_packages for f in dir(pkg) if f.startswith('make_')}  # conversion candidates
 for func_name in _sampling_funcs:
     func = get_first_matching_attribute(objs=_sampling_source_packages, name=func_name)

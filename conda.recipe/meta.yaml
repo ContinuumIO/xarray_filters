@@ -21,7 +21,6 @@ requirements:
     - scikit-learn
     - six
     - dask-ml
-    - attrs
     - rasterio
 
 about:
