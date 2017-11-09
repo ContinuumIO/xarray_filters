@@ -26,42 +26,8 @@ class MLDataset(xr.Dataset):
     class defintion - wrap the documentation for to_features,
     from_features, and concat_ml_features, and chain methods
     '''
-    def load(self, filepaths, meta=None, verify=True, loader=None):
-        """Register list of filepaths (which may include directory paths) as
-        data sources. This method may be called multiple times to register
-        different file/directory paths separately. Each data source must be
-        loadable via xarray or dask; complete list of supported data sources
-        available here:
-
-        Xarray data sources: http://xarray.pydata.org/en/stable/io.html
-        Dask data sources: https://dask.pydata.org/en/latest/dataframe-api.html#create-dataframes
-
-        Some lightweight verification steps may be performed by this method to
-        confirm that the data sources are valid/reachable, but data source(s)
-        will only be loaded on-demand (as needed) to conserve compute resources.
-
-        Parameters:
-            :filepaths: list of str/bytes; e.g. file paths (HDF4 / 5 or NetCDF) or directory paths (TIF)
-            :meta:      dict of str->dict; meta data for "filepaths". Each (key, value) pair represents a filepath and its meta data.
-            :verify:    bool; False means "skip verification steps".
-            :loader:    function or None; function can be `xr.open_rasterio`, for example. If None, uses `earthio.load_layers`.
-        """
-        if not hasattr(self, '__data_sources'):
-            self.__data_sources = {}
-        for fpath_or_dpath in filepaths:
-            info = {
-                'registered': False,
-                'meta': meta.get(fpath_or_dpath),
-                'loader': loader,
-            }
-            if verify:
-                # Verification steps go here
-                pass
-            info['registered'] = True
-            if info.get('loader', None) is None:
-                import earthio
-                info['loader'] = earthio.load_layers
-            self.__data_sources[fpath_or_dpath] = info
+    def load(self):
+        super(MLDataset, self).load()
 
     def to_features(self, *args, **kwargs):
         '''* TODO Gui - wrap docstring for to_features'''
