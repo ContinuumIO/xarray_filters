@@ -142,7 +142,7 @@ def test_from_features_dropped_rows(X):
 
     # Assert that we get the original Dataset back after X.to_features().from_features()
     assert np.array_equal(data1.coords.to_index().values, X.coords.to_index().values)
-    assert np.allclose(data1.to_array()[0], X.to_array()[0])
+    assert np.allclose(data1.to_xy_arrays()[0], X.to_xy_arrays()[0])
 
     # Drop some rows
     features['features'].values[:2, :] = np.nan
@@ -153,6 +153,6 @@ def test_from_features_dropped_rows(X):
     data2 = features.from_features()
 
     # Assert that the coords are correct, and NaNs are in the right places
-    if np.nan in data2.to_array()[0]:
+    if np.nan in data2.to_xy_arrays()[0]:
         assert np.array_equal(data2.coords.to_index().values, data1.coords.to_index().values)
-        assert np.allclose(data2.to_array()[0], zerod_vals_copy, equal_nan=True)
+        assert np.allclose(data2.to_xy_arrays()[0], zerod_vals_copy, equal_nan=True)

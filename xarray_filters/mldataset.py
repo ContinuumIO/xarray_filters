@@ -11,7 +11,8 @@ from xarray_filters.chain import chain
 from xarray_filters.reshape import (to_features,
                                     from_features,
                                     concat_ml_features,
-                                    has_features)
+                                    has_features,
+                                    to_xy_arrays)
 from xarray_filters.constants import FEATURES_LAYER, YNAME
 
 __all__ = ['MLDataset',]
@@ -27,7 +28,7 @@ class MLDataset(xr.Dataset):
     from_features, and concat_ml_features, and chain methods
     '''
 
-    def to_features(self,*args, **kwargs):
+    def to_features(self, *args, **kwargs):
         '''* TODO Gui - wrap docstring for to_features'''
         return to_features(self, *args, **kwargs)
 
@@ -65,46 +66,12 @@ class MLDataset(xr.Dataset):
             yname = YNAME
         return yname
 
-    def _extract_y_from_features(self, dset=None, y=None, features_layer=None,
-                                 yname=YNAME, y1d=True, as_np=True):
-        features_layer = features_layer or FEATURES_LAYER
-        features_layer = has_features(dset, features_layer=features_layer, raise_err=False)
-        if dset is None:
-            dset = self
-        if features_layer:
-            arr = dset[features_layer]
-            col_dim = arr.dims[1]
-            col_labels = getattr(arr, col_dim)
-            idxes = [col for col, item in enumerate(col_labels)
-                     if col != yname]
-            xkw = {col_dim: idxes}
-            ykw = {col_dim: yname}
-            X = arr.isel(**xkw)
-            if y is None:
-                if yname in getattr(arr, arr.dims[-1], pd.Series([]).values):
-                    y = arr.isel(**ykw)
-                    if as_np:
-                        y = y.values
-            if as_np and y1d and y is not None and y.ndim == 2 and y.shape[1] == 1:
-                y = y.squeeze()
-            if as_np:
-                X = X.values
-                return X, y
-            else:
-                return X.to_dataframe(), y.to_dataframe()
-        else:
-            raise ValueError('TODO --- msg? {}'.format((self, dset)))
 
-    def to_array(self, y=None, features_layer=None, **kw):
+    def to_xy_arrays(self, y=None, features_layer=None, **kw):
         "Return X, y NumPy arrays with given shape"
-        features_layer = self.has_features(raise_err=False, features_layer=features_layer)
-        if not features_layer:
-            dset = self.to_features(features_layer=features_layer, **kw)
-        else:
-            dset = self
-        return self._extract_y_from_features(dset=dset, y=y,
-                                             features_layer=features_layer,
-                                             as_np=True)
+        return to_xy_arrays(dset=self, y=y,
+                            features_layer=features_layer,
+                            as_np=True)
 
 
     def to_dataframe(self, layers=None, yname=None):

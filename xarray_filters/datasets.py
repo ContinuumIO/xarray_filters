@@ -58,7 +58,7 @@ For example, to obtain the exact same behavior as in sklearn, you can pass
 `astype='array'`:
 
 To support all the conversions, we create a class `NpXyTransformer` that has one
-method (`to_array`, `to_dataset`, `to_dataframe`, etc.) per conversion. In
+method (`to_xy_arrays`, `to_dataset`, `to_dataframe`, etc.) per conversion. In
 addition, we implement a `_make_base` function that maps a
 `sklearn.datasets.make_*` function to the new, extended version with a useful
 docstring. On Python 3 that new function also has an appropriate/helpful
@@ -137,7 +137,7 @@ class NpXyTransformer(object):
         self.X = X  # always a 2d numpy.array
         self.y = y  # always a 1d numpy.array
 
-    def to_array(self, xshape=None):
+    def to_xy_arrays(self, xshape=None):
         """Return X, y NumPy arrays with given shape
 
         Parameters
@@ -158,10 +158,10 @@ class NpXyTransformer(object):
         --------
         >>> transformer = make_blobs(n_samples=4, n_features=3, random_state=0,
         ...     astype=None, chunks=2)
-        >>> X, y = transformer.to_array()
+        >>> X, y = transformer.to_xy_arrays()
         >>> X.shape
         (4, 3)
-        >>> X, y = transformer.to_array(xshape=(12, 1))
+        >>> X, y = transformer.to_xy_arrays(xshape=(12, 1))
         >>> X.shape
         (12, 1)
         """
@@ -312,7 +312,7 @@ class NpXyTransformer(object):
         --------
 
         NpXyTransformer.to_dataset
-        NpXyTransformer.to_array
+        NpXyTransformer.to_xy_arrays
         NpXyTransformer.to_dataframe
         NpXyTransformer.to_*
         etc...

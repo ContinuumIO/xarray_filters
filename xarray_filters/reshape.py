@@ -14,7 +14,8 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 
-from xarray_filters.constants import FEATURES_LAYER_DIMS, FEATURES_LAYER
+from xarray_filters.constants import (FEATURES_LAYER_DIMS,
+                                      FEATURES_LAYER, YNAME)
 from xarray_filters.multi_index import create_multi_index, multi_index_to_coords
 from xarray_filters.pipe_utils import for_each_array
 
@@ -146,6 +147,8 @@ def to_features(dset, layers=None, row_dim=None,
     '''
     from xarray_filters.mldataset import MLDataset
     arrs = []
+    if has_features(dset, raise_err=False, features_layer=features_layer):
+        return dset
     if features_layer is None:
         features_layer = FEATURES_LAYER
     if row_dim is None:
@@ -254,6 +257,46 @@ def from_features(arr, axis=0):
         layer = simple_np_arr[j]
         dset[layer] = xr.DataArray(val, coords=coords, dims=dims)
     return MLDataset(dset)
+
+
+def to_xy_arrays(dset=None, y=None, features_layer=None,
+                 yname=YNAME, y1d=True, as_np=True):
+
+    from xarray_filters.mldataset import MLDataset
+    orig_kw = dict(features_layer=features_layer, yname=yname,
+                   y1d=y1d, as_np=as_np)
+    if isinstance(y, xr.Dataset):
+        y = MLDataset(y)
+    if isinstance(y, MLDataset):
+        y = y.to_features(features_layer=features_layer)
+        orig_kw['dset'] = y
+        y, _ = to_xy_arrays(**orig_kw)
+        orig_kw['dset'] = dset
+        dset, _ = to_xy_arrays(**orig_kw)
+        return dset, y
+    if not isinstance(dset, (xr.Dataset, MLDataset)):
+        return dset, y
+    dset = dset.to_features(features_layer=features_layer)
+    arr = dset[features_layer or FEATURES_LAYER]
+    col_dim = arr.dims[1]
+    col_labels = getattr(arr, col_dim)
+    idxes = [col for col, item in enumerate(col_labels)
+             if col != yname]
+    xkw = {col_dim: idxes}
+    ykw = {col_dim: yname}
+    X = arr.isel(**xkw)
+    if y is None:
+        if yname in getattr(arr, arr.dims[-1], pd.Series([]).values):
+            y = arr.isel(**ykw)
+            if as_np:
+                y = y.values
+    if as_np and y1d and y is not None and y.ndim == 2 and y.shape[1] == 1:
+        y = y.squeeze()
+    if as_np:
+        X = X.values
+        return X, y
+    else:
+        return X.to_dataframe(), y.to_dataframe()
 
 
 def _same_size_dims_arrs(*arrs, **kwargs):
