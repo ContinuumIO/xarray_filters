@@ -4,16 +4,9 @@ channels:
  - conda-forge # essential for rasterio on osx
 dependencies:
  - python=3.6
- - dask
  - numba
- - numpy
- - pandas
- - pytest
- - pytest-cov
- - scikit-learn
  - xarray
+ - dask
+ - scikit-learn
  - six
- - attrs
- - conda-forge::rasterio
- - conda-forge::gdal=2.1.*
- - conda-forge::dask-ml
+ - dask-ml
