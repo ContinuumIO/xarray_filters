@@ -27,6 +27,8 @@ class MLDataset(xr.Dataset):
     class defintion - wrap the documentation for to_features,
     from_features, and concat_ml_features, and chain methods
     '''
+    def load(self):
+        super(MLDataset, self).load()
 
     def to_features(self, *args, **kwargs):
         '''* TODO Gui - wrap docstring for to_features'''
