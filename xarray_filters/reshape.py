@@ -22,7 +22,8 @@ from xarray_filters.pipe_utils import for_each_array
 __all__ = ['has_features',
            'concat_ml_features',
            'from_features',
-           'to_features',]
+           'to_features',
+           'to_xy_arrays']
 
 
 def has_features(dset, raise_err=True, features_layer=None):
@@ -276,7 +277,10 @@ def to_xy_arrays(dset=None, y=None, features_layer=None,
         return dset, y
     if not isinstance(dset, (xr.Dataset, MLDataset)):
         return dset, y
-    dset = dset.to_features(features_layer=features_layer)
+    if dset is None:
+        y, _ = to_xy_arrays(dset=y, **orig_kw)
+        return None, y
+    dset = to_features(dset, features_layer=features_layer)
     arr = dset[features_layer or FEATURES_LAYER]
     col_dim = arr.dims[1]
     col_labels = getattr(arr, col_dim)

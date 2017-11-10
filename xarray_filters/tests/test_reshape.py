@@ -1,8 +1,11 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 from collections import OrderedDict
+from itertools import product
 
+import dask.array as da
 import numpy as np
+import pandas as pd
 import pytest
 import xarray as xr
 
@@ -120,7 +123,7 @@ def test_data_vars_keywords_positional(layers):
     else:
         assert len(X2.data_vars)
 
-@pytest.mark.parametrize('X', [
+Xs = [
     MLDataset({'pressure': xr.DataArray(np.random.uniform(0, 1, (2,3)),
                                         coords={'x': np.arange(2),
                                                 'y': np.arange(3)},
@@ -135,7 +138,8 @@ def test_data_vars_keywords_positional(layers):
                'temperature': xr.DataArray(np.random.uniform(0, 1, 6),
                                            coords={'x': np.arange(6)},
                                            dims=['x'])}),
-])
+]
+@pytest.mark.parametrize('X', Xs)
 def test_from_features_dropped_rows(X):
     features = X.to_features()
     data1 = features.from_features()
@@ -156,3 +160,48 @@ def test_from_features_dropped_rows(X):
     if np.nan in data2.to_xy_arrays()[0]:
         assert np.array_equal(data2.coords.to_index().values, data1.coords.to_index().values)
         assert np.allclose(data2.to_xy_arrays()[0], zerod_vals_copy, equal_nan=True)
+
+dsets = [xr.Dataset(x) for x in Xs]
+np_arrs = [x.to_features().features.values for x in Xs]
+dfs = [pd.DataFrame(x.to_features().features.values) for x in Xs]
+choices = {
+    'mldataset': Xs,
+   # 'dataset': dsets,
+   # 'numpy': np_arrs,
+   # 'dataframe': dfs,
+}
+
+y_types = ('numpy', )# 'mldataset', dataset', 'numpy', 'none',)
+@pytest.mark.parametrize('X_key, y_type, idx', product(choices, y_types, range(len(Xs))))
+def test_to_xy_arrays(X_key, y_type, idx):
+    X = choices[X_key][idx]
+    shp = to_features(X).features.shape
+    rows = shp[0]
+    y = np.arange(rows)[:, np.newaxis]
+    if y_type in ('mldataset', 'dataset'):
+        y = to_features(X).features.values.sum(axis=1)[:, np.newaxis]
+
+        coords = {'space': np.arange(y.shape[0]), 'layer': ['y']}
+        arr = xr.DataArray(y,
+                           coords=coords,
+                           dims=('space', 'layer'))
+        y = MLDataset(OrderedDict([('y', arr)]))
+        if y_type == 'dataset':
+            y = xr.Dataset(y)
+    elif y_type == 'none':
+        y = None
+    if X is not None and hasattr(X, 'to_xy_arrays'):
+        X2, y2 = X.to_xy_arrays(y)
+        X3, y3 = to_xy_arrays(X, y)
+        assert (X2 is None and X3 is None) or (np.allclose(X2, X3))
+        assert (y2 is None and y3 is None) or (np.allclose(y2, y3))
+    else:
+        X2, y2 = to_xy_arrays(X, y)
+    if X is not None:
+        assert isinstance(X2, np.ndarray)
+    else:
+        assert X2 is None
+    if y is None:
+        assert y2 is None
+    else:
+        assert isinstance(y2, np.ndarray)
