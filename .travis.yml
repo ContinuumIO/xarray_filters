@@ -31,8 +31,10 @@ script:
 notifications:
   on_success: change
   on_failure: always
-  flowdock:
-    secure: "qJfMEqTfEE7570pOcfoLzy4MsPBZ43igdR7zeQbOocH2UM5ort3GN1VakX4AnVbsNQREVz2i6lGlOFb7npQAV0Wgh6VTRrRYwuOdHL5P3YTR6p2voZr757BfAW3vaJCpsKLdDyTeFr/8qoD5GsKFzRPhJESrBnk57ll9YyhipYe1tg3RS/xt/EqO9V4bunCHeFYJ7UNEOx9ELDatOD8GeWmrLcgBuEM3B0EOrYr/rRNvjPTYPTq4MAq5k9mNbRWX/Y0KNGo0cPRXdXze5YCSfrhVUIxfDQ17lZeus8CmZsGqcRgmSFd0zV47zuU1uQp+A9DEVTPqVgcwPHBvjBc7YDXO74f6qMhFN2OaBFQcbHr/B64P4Qw0EOcWey2fa9/A7zoIWmMPx72ccJVdcpG761x2ZXM2e6MRcjgBvATPiKFxqwxmQvnGfJIn3hQaiRghbVdju6zK9sQlsDbrLSTvfbZD73httIg7UgKHyhPuErSpfV9TlwWbtnolKtVNlqs5GW/9d3tMZw4XWQCOmc3b3DPDY3Rje2JxW94qiNIleU6/Lo5SlU1sH/+cfB7+WkIQhDuWSdNPNlLU9kqHZTEmkSw5KYjcD5rDxy2Bcv+5mCpR8iUcR1LCvQHj/ov3zoBZgmsWwY2CU/mAddk4Ij609FawKSZ9MlX6Djh0ENJcI6c="
+  flowdock: $FD_TOKEN
+
+deploy:
+  secure: "qJfMEqTfEE7570pOcfoLzy4MsPBZ43igdR7zeQbOocH2UM5ort3GN1VakX4AnVbsNQREVz2i6lGlOFb7npQAV0Wgh6VTRrRYwuOdHL5P3YTR6p2voZr757BfAW3vaJCpsKLdDyTeFr/8qoD5GsKFzRPhJESrBnk57ll9YyhipYe1tg3RS/xt/EqO9V4bunCHeFYJ7UNEOx9ELDatOD8GeWmrLcgBuEM3B0EOrYr/rRNvjPTYPTq4MAq5k9mNbRWX/Y0KNGo0cPRXdXze5YCSfrhVUIxfDQ17lZeus8CmZsGqcRgmSFd0zV47zuU1uQp+A9DEVTPqVgcwPHBvjBc7YDXO74f6qMhFN2OaBFQcbHr/B64P4Qw0EOcWey2fa9/A7zoIWmMPx72ccJVdcpG761x2ZXM2e6MRcjgBvATPiKFxqwxmQvnGfJIn3hQaiRghbVdju6zK9sQlsDbrLSTvfbZD73httIg7UgKHyhPuErSpfV9TlwWbtnolKtVNlqs5GW/9d3tMZw4XWQCOmc3b3DPDY3Rje2JxW94qiNIleU6/Lo5SlU1sH/+cfB7+WkIQhDuWSdNPNlLU9kqHZTEmkSw5KYjcD5rDxy2Bcv+5mCpR8iUcR1LCvQHj/ov3zoBZgmsWwY2CU/mAddk4Ij609FawKSZ9MlX6Djh0ENJcI6c="
   - provider: script
     script:
       - ~/miniconda/bin/conda install --name root anaconda-client && ~/miniconda/bin/conda build $INSTALL_CHANNELS --output --python $PYTHON --numpy $NUMPY conda.recipe | xargs ~/miniconda/bin/conda convert -p all -o _pkgs && find _pkgs -type f -name "*.tar.bz2" -exec ~/miniconda/bin/anaconda --token $ANACONDA_UPLOAD_TOKEN upload --user $ANACONDA_UPLOAD_USER --label dev --force {} \+
