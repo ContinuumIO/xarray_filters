@@ -21,7 +21,6 @@ requirements:
     - scikit-learn
     - six
     - dask-ml
-    - rasterio
 
 about:
   home: http://github.com/ContinuumIO/xarray_filters
@@ -29,9 +28,8 @@ about:
 
 extra:
   maintainers:
-    - Peter Steinberg              - Anaconda, Inc. - psteinberg [at] anaconda [dot] com
-    - Guilherme Pereira de Freitas - Anaconda, Inc. - gfreitas [at] anaconda [dot] com
-    - Greg Brener                  - Anaconda, Inc. - gbrener [at] anaconda [dot] com
+    - Peter Steinberg - Anaconda, Inc. - psteinberg [at] anaconda [dot] com
+    - Greg Brener - Anaconda, Inc. - gbrener [at] anaconda [dot] com
 
 test:
   imports:
