@@ -13,7 +13,4 @@ dependencies:
  - scikit-learn
  - xarray
  - six
- - attrs
- - conda-forge::rasterio
- - conda-forge::gdal=2.1.*
  - conda-forge::dask-ml
