@@ -53,7 +53,9 @@ def multi_index_to_coords(arr, axis=0):
         return coords, (dim,)
     if any(name is None for name in multi.names):
         raise ValueError('Expected MultiIndex with named components (found {})'.format(multi.names))
-    np_arrs = (np.unique(x) for x in np.array(multi.tolist()).T)
+    cols = np.array(multi.tolist()).T
+    ascend = [(1 if c[0] < c[-1] else -1) for c in cols]
+    np_arrs = (np.unique(c)[::a] for c, a in zip(cols, ascend))
     coords = OrderedDict(zip(multi.names, np_arrs))
     dims = tuple(coords)
     return coords, dims

@@ -26,6 +26,8 @@ __all__ = ['has_features',
            'to_xy_arrays']
 
 
+RAVEL_ORDER = 'C'
+
 def has_features(dset, raise_err=True, features_layer=None):
     '''Check if an MLDataset has a DataArray called "features"
     with dimensions (space, layer)
@@ -174,7 +176,7 @@ def to_features(dset, layers=None, row_dim=None,
             index = getattr(arr, row_dim)
         else:
             index = create_multi_index(arr)
-        val = val.ravel()[:, np.newaxis]
+        val = val.ravel(order=RAVEL_ORDER)[:, np.newaxis]
         coords = OrderedDict([(row_dim, index),
                               (col_dim, [layer])])
         new_dims = (row_dim, col_dim)
@@ -251,10 +253,11 @@ def from_features(arr, axis=0):
             val = np.full(shp, np.nan)
             feature_idx = arr.indexes[arr.dims[0]]
             dim_coord_pairs = feature_idx.tolist()
+            row, col = coords[dims[0]], coords[dims[1]]
             for idx, dim_coord_pair in enumerate(dim_coord_pairs):
-                val[dim_coord_pair] = arr_val[idx]
+                val[(dim_coord_pair[0] == row), (dim_coord_pair[1] == col)] = arr_val[idx]
         else:
-            val = arr_val.reshape(shp)
+            val = arr_val.reshape(shp, order=RAVEL_ORDER)
         layer = simple_np_arr[j]
         dset[layer] = xr.DataArray(val, coords=coords, dims=dims)
     return MLDataset(dset)
@@ -290,7 +293,8 @@ def to_xy_arrays(dset=None, y=None, features_layer=None,
     ykw = {col_dim: yname}
     X = arr.isel(**xkw)
     if y is None:
-        if yname in getattr(arr, arr.dims[-1], pd.Series([]).values):
+        col_names = getattr(arr, arr.dims[-1])
+        if yname in col_names.values:
             y = arr.isel(**ykw)
             if as_np:
                 y = y.values
